@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"net/mail"
+	"net/url"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -84,10 +86,16 @@ func (newJob *NewJob) validate(update bool) map[string]string {
 		errs["url"] = "Must provide either a Url or a Description"
 	}
 
-	// TODO: validate Url
+	if _, err := url.ParseRequestURI(newJob.Url); err != nil {
+		errs["url"] = "Must provide a valid Url"
+	}
 
 	if !update && newJob.Email == "" {
-		// TODO: validate email
+		errs["email"] = "Must provide an Email Address"
+	}
+
+	// TODO: Maybe do more than just validate email format?
+	if _, err := mail.ParseAddress(newJob.Email); err != nil {
 		errs["email"] = "Must provide a valid Email"
 	}
 
