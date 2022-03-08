@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/mail"
 	"net/url"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 )
 
 // data
@@ -32,6 +36,30 @@ func (job *Job) update(newParams NewJob) {
 
 	job.Description.String = newParams.Description
 	job.Description.Valid = newParams.Description != ""
+}
+
+func (job *Job) RenderDescription() (string, error) {
+	if !job.Description.Valid {
+		return "", nil
+	}
+
+	markdown := goldmark.New(
+		goldmark.WithExtensions(
+			extension.NewLinkify(
+				extension.WithLinkifyAllowedProtocols([][]byte{
+					[]byte("http:"),
+					[]byte("https:"),
+				}),
+			),
+		),
+	)
+
+	var b bytes.Buffer
+	if err := markdown.Convert([]byte(job.Description.String), &b); err != nil {
+		return "", fmt.Errorf("failed to convert job descroption to markdown (job id: %s): %w", job.ID, err)
+	}
+
+	return b.String(), nil
 }
 
 func (job *Job) save(db *sqlx.DB) (sql.Result, error) {
@@ -86,8 +114,10 @@ func (newJob *NewJob) validate(update bool) map[string]string {
 		errs["url"] = "Must provide either a Url or a Description"
 	}
 
-	if _, err := url.ParseRequestURI(newJob.Url); err != nil {
-		errs["url"] = "Must provide a valid Url"
+	if newJob.Description == "" {
+		if _, err := url.ParseRequestURI(newJob.Url); err != nil {
+			errs["url"] = "Must provide a valid Url"
+		}
 	}
 
 	if !update {

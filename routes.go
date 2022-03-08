@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 
 	"github.com/gin-contrib/sessions"
@@ -157,7 +158,14 @@ func (ctrl *Controller) ViewJob(ctx *gin.Context) {
 	if err != nil {
 		panic(err) // TODO: err
 	}
-	ctx.HTML(200, "view", gin.H{"job": job})
+
+	description, err := job.RenderDescription()
+	if err != nil {
+		log.Println("failed to render job description as markdown: %w", err)
+		description = job.Description.String
+	}
+
+	ctx.HTML(200, "view", gin.H{"job": job, "description": template.HTML(description)})
 }
 
 func addFlash(ctx *gin.Context, base gin.H) gin.H {
