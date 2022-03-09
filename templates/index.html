@@ -3,7 +3,7 @@
   {{ range .jobs }}
     <li class="flex mb-2 p-4 relative border-b sm:border-b-0 last:border-b-0 hover:bg-blue-100 group sm:rounded-lg">
       <div class="w-full sm:pr-16">
-        <h2 class="font-bold text-lg">{{ .Position }}</h2>
+        <h2 class="m-0 font-bold text-lg">{{ .Position }}</h2>
         <div>{{ .Organization }}</div>
         <a
             href="/jobs/{{ .ID }}"

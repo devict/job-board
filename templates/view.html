@@ -1,7 +1,10 @@
 {{ define "content" }}
-  <h2 class="font-bold text-lg">{{ .job.Position }}</h2>
+  <h2 class="m-0 font-bold text-lg">{{ .job.Position }}</h2>
   <div class="mb-6">{{ .job.Organization }}</div>
-  <div class="mb-6">{{ .description }}</div>
+  {{ if.job.Description.Valid }}
+    <hr>
+    <div class="mb-6">{{ .description }}</div>
+  {{ end }}
   {{ if .job.Url.Valid }}
   <div class="mb-6">
     <a href="{{ .job.Url.String }}" target="_blank" class="btn btn-primary">
