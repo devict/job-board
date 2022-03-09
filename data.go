@@ -14,9 +14,6 @@ import (
 	"github.com/yuin/goldmark/extension"
 )
 
-// data
-// -------------------------------------
-
 type Job struct {
 	ID           string         `db:"id"`
 	Position     string         `db:"position"`

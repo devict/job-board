@@ -395,12 +395,12 @@ fieldset {
   padding: 0;
 }
 
-ol,
-ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
+/* ol, */
+/* ul { */
+/*   list-style: none; */
+/*   margin: 0; */
+/*   padding: 0; */
+/* } */
 
 /**
  * Tailwind custom reset styles
@@ -501,15 +501,15 @@ table {
   border-collapse: collapse;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-size: inherit;
-  font-weight: inherit;
-}
+/* h1, */
+/* h2, */
+/* h3, */
+/* h4, */
+/* h5, */
+/* h6 { */
+/*   font-size: inherit; */
+/*   font-weight: inherit; */
+/* } */
 
 /**
  * Reset links to optimize for opt-in styling instead of
@@ -517,8 +517,16 @@ h6 {
  */
 
 a {
-  color: inherit;
   text-decoration: inherit;
+  color: rgba(220,121,0,1);
+}
+
+a:hover, a:active {
+  text-decoration: underline;
+}
+
+header a:hover {
+  text-decoration: none;
 }
 
 /**
@@ -106686,4 +106694,3 @@ video {
             animation: bounce 1s infinite;
   }
 }
-
