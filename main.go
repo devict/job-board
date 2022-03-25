@@ -25,6 +25,9 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Flags() | log.Lshortfile)
+	log.SetOutput(os.Stderr)
+
 	if err := run(); err != nil {
 		log.Fatalln("main failed to run:", err)
 	}
@@ -85,6 +88,8 @@ func run() error {
 	ctrl := &Controller{DB: db, Config: config}
 
 	gin.SetMode(config.Env)
+	gin.DefaultWriter = log.Default().Writer()
+
 	router := gin.Default()
 
 	if err := router.SetTrustedProxies(nil); err != nil {
