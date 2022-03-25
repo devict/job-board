@@ -85,8 +85,6 @@ func run() error {
 		}
 	}()
 
-	ctrl := &Controller{DB: db, Config: config}
-
 	gin.SetMode(config.Env)
 	gin.DefaultWriter = log.Default().Writer()
 
@@ -111,6 +109,7 @@ func run() error {
 	router.Static("/assets", "assets")
 	router.HTMLRender = renderer()
 
+	ctrl := &Controller{DB: db, Config: config}
 	router.GET("/", ctrl.Index)
 	router.GET("/new", ctrl.NewJob)
 	router.POST("/jobs", ctrl.CreateJob)
@@ -179,7 +178,9 @@ func requireAuth(db *sqlx.DB, secret string) func(*gin.Context) {
 		jobID := ctx.Param("id")
 		job, err := getJob(jobID, db)
 		if err != nil {
-			panic(err) // TODO: handle!
+			log.Println(fmt.Errorf("requireAuth failed to getJob: %w", err))
+			ctx.AbortWithStatus(http.StatusInternalServerError)
+			return
 		}
 
 		token := ctx.Query("token")
