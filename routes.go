@@ -89,6 +89,7 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 		return
 	}
 
+	if ctrl.Config.Email.SMTPHost != "" {
 	// TODO: make this a nicer html template?
 	message := fmt.Sprintf(
 		"Your job has been created!\n\n<a href=\"%s\">Use this link to edit the job posting</a>",
@@ -97,6 +98,7 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 	err = sendEmail(newJobInput.Email, "Job Created!", message, ctrl.Config.Email)
 	if err != nil {
 		panic(err) // TODO: handle
+	}
 	}
 
 	if ctrl.Config.SlackHook != "" {
