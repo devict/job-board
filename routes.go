@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net/http"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -18,7 +19,9 @@ type Controller struct {
 func (ctrl *Controller) Index(ctx *gin.Context) {
 	jobs, err := getAllJobs(ctrl.DB)
 	if err != nil {
-		panic(err) // TODO: handle this
+		log.Println(fmt.Errorf("Index failed to getAllJobs: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
 	}
 
 	ctx.HTML(200, "index", addFlash(ctx, gin.H{
@@ -47,7 +50,9 @@ func (ctrl *Controller) EditJob(ctx *gin.Context) {
 	id := ctx.Param("id")
 	job, err := getJob(id, ctrl.DB)
 	if err != nil {
-		panic(err) // TODO: err
+		log.Println(fmt.Errorf("failed to getJob: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
 	}
 
 	token := ctx.Query("token")
@@ -64,7 +69,11 @@ func (ctrl *Controller) EditJob(ctx *gin.Context) {
 
 func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 	var newJobInput NewJob
-	ctx.Bind(&newJobInput)
+	if err := ctx.Bind(&newJobInput); err != nil {
+		log.Println(fmt.Errorf("failed to ctx.Bind: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
 
 	session := sessions.Default(ctx)
 	defer func() {
@@ -84,34 +93,36 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 
 	job, err := newJobInput.saveToDB(ctrl.DB)
 	if err != nil {
-		log.Print(fmt.Errorf("failed to save job to db: %w", err))
-
+		log.Println(fmt.Errorf("failed to save job to db: %w", err))
 		session.AddFlash("Error creating job")
 		ctx.Redirect(302, "/new")
 		return
 	}
 
 	if ctrl.Config.Email.SMTPHost != "" {
-	// TODO: make this a nicer html template?
-	message := fmt.Sprintf(
-		"Your job has been created!\n\n<a href=\"%s\">Use this link to edit the job posting</a>",
-		signedJobRoute(job, ctrl.Config),
-	)
-	err = sendEmail(newJobInput.Email, "Job Created!", message, ctrl.Config.Email)
-	if err != nil {
-		panic(err) // TODO: handle
-	}
+		// TODO: make this a nicer html template?
+		message := fmt.Sprintf(
+			"Your job has been created!\n\n<a href=\"%s\">Use this link to edit the job posting</a>",
+			signedJobRoute(job, ctrl.Config),
+		)
+		err = sendEmail(newJobInput.Email, "Job Created!", message, ctrl.Config.Email)
+		if err != nil {
+			log.Println(fmt.Errorf("failed to sendEmail: %w", err))
+			// continuing...
+		}
 	}
 
 	if ctrl.Config.SlackHook != "" {
 		if err = postToSlack(job, ctrl.Config); err != nil {
-			panic(err) // TODO: handle
+			log.Println(fmt.Errorf("failed to postToSlack: %w", err))
+			// continuing...
 		}
 	}
 
 	if ctrl.Config.Twitter.AccessToken != "" {
 		if err = postToTwitter(job, ctrl.Config); err != nil {
-			panic(err)
+			log.Println(fmt.Errorf("failed to postToTwitter: %w", err))
+			// continuing...
 		}
 	}
 
@@ -123,7 +134,11 @@ func (ctrl *Controller) UpdateJob(ctx *gin.Context) {
 	id := ctx.Param("id")
 
 	var newJobInput NewJob
-	ctx.Bind(&newJobInput)
+	if err := ctx.Bind(&newJobInput); err != nil {
+		log.Println(fmt.Errorf("failed to ctx.Bind: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
 
 	session := sessions.Default(ctx)
 	defer func() {
@@ -144,12 +159,16 @@ func (ctrl *Controller) UpdateJob(ctx *gin.Context) {
 
 	job, err := getJob(id, ctrl.DB)
 	if err != nil {
-		panic(err) // TODO: handle
+		log.Println(fmt.Errorf("failed to getJob: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
 	}
 
 	job.update(newJobInput)
 	if _, err = job.save(ctrl.DB); err != nil {
-		panic(err) // TODO: handle
+		log.Println(fmt.Errorf("failed to job.save: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
 	}
 
 	session.AddFlash("Job updated!")
@@ -160,13 +179,16 @@ func (ctrl *Controller) ViewJob(ctx *gin.Context) {
 	id := ctx.Param("id")
 	job, err := getJob(id, ctrl.DB)
 	if err != nil {
-		panic(err) // TODO: err
+		log.Println(fmt.Errorf("failed to getJob: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
 	}
 
 	description, err := job.RenderDescription()
 	if err != nil {
-		log.Println("failed to render job description as markdown: %w", err)
+		log.Println(fmt.Errorf("failed to render job description as markdown: %w", err))
 		description = job.Description.String
+		// continuing...
 	}
 
 	ctx.HTML(200, "view", gin.H{"job": job, "description": template.HTML(description)})
