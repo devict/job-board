@@ -67,12 +67,16 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 	ctx.Bind(&newJobInput)
 
 	session := sessions.Default(ctx)
+	defer func() {
+		if err := session.Save(); err != nil {
+			log.Println(fmt.Errorf("CreateJob failed to session.Save: %w", err))
+		}
+	}()
 
 	if errs := newJobInput.validate(false); len(errs) != 0 {
 		for k, v := range errs {
 			session.AddFlash(v, fmt.Sprintf("%s_err", k))
 		}
-		session.Save()
 
 		ctx.Redirect(302, "/new")
 		return
@@ -83,8 +87,6 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 		log.Print(fmt.Errorf("failed to save job to db: %w", err))
 
 		session.AddFlash("Error creating job")
-		session.Save()
-
 		ctx.Redirect(302, "/new")
 		return
 	}
@@ -114,8 +116,6 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 	}
 
 	session.AddFlash("Job created!")
-	session.Save()
-
 	ctx.Redirect(302, "/")
 }
 
@@ -126,12 +126,16 @@ func (ctrl *Controller) UpdateJob(ctx *gin.Context) {
 	ctx.Bind(&newJobInput)
 
 	session := sessions.Default(ctx)
+	defer func() {
+		if err := session.Save(); err != nil {
+			log.Println(fmt.Errorf("failed to session.Save: %w", err))
+		}
+	}()
 
 	if errs := newJobInput.validate(true); len(errs) != 0 {
 		for k, v := range errs {
 			session.AddFlash(v, fmt.Sprintf("%s_err", k))
 		}
-		session.Save()
 
 		// TODO: somehow preserve previously provided values?
 		ctx.Redirect(302, "/jobs/"+id+"/edit")
@@ -149,8 +153,6 @@ func (ctrl *Controller) UpdateJob(ctx *gin.Context) {
 	}
 
 	session.AddFlash("Job updated!")
-	session.Save()
-
 	ctx.Redirect(302, "/")
 }
 
