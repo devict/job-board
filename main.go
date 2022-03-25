@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/multitemplate"
@@ -33,8 +38,6 @@ func run() error {
 		return fmt.Errorf("failed to LoadConfig: %w", err)
 	}
 
-	gin.SetMode(config.Env)
-
 	// migrate the db on startup
 	m, err := migrate.New("file://sql", config.DatabaseURL)
 	if err != nil {
@@ -54,18 +57,34 @@ func run() error {
 		return fmt.Errorf("failed to sqlx.Open: %w", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg := sync.WaitGroup{}
+
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+
 		for {
-			_, err := db.Exec("DELETE FROM jobs WHERE published_at < NOW() - INTERVAL '30 DAYS'")
-			if err != nil {
-				log.Println(fmt.Errorf("error clearing old jobs: %w", err))
+			select {
+			case <-ctx.Done():
+				log.Println("shutting down old jobs background process")
+				return
+			case <-ticker.C:
+				_, err := db.Exec("DELETE FROM jobs WHERE published_at < NOW() - INTERVAL '30 DAYS'")
+				if err != nil {
+					log.Println(fmt.Errorf("error clearing old jobs: %w", err))
+				}
 			}
-			time.Sleep(1 * time.Hour)
 		}
 	}()
 
 	ctrl := &Controller{DB: db, Config: config}
 
+	gin.SetMode(config.Env)
 	router := gin.Default()
 
 	if err := router.SetTrustedProxies(nil); err != nil {
@@ -99,9 +118,38 @@ func run() error {
 		authorized.POST("/jobs/:id", ctrl.UpdateJob)
 	}
 
-	if err := router.Run(); err != nil {
-		return fmt.Errorf("failed to Run: %w", err)
+	server := http.Server{
+		Addr:    config.Port,
+		Handler: router,
 	}
+
+	serverErrors := make(chan error, 1)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		log.Printf("server listening on port %s", server.Addr)
+		serverErrors <- server.ListenAndServe()
+	}()
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case <-serverErrors:
+		return fmt.Errorf("received server error: %w", err)
+
+	case sig := <-shutdown:
+		log.Printf("received shutdown signal %q", sig)
+
+		cancel()
+
+		if err := server.Shutdown(context.Background()); err != nil {
+			return fmt.Errorf("failed to server.Shutdown: %w", err)
+		}
+	}
+
+	wg.Wait()
 
 	return nil
 }
