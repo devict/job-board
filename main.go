@@ -86,7 +86,7 @@ func run() error {
 	}()
 
 	gin.SetMode(config.Env)
-	gin.DefaultWriter = log.Default().Writer()
+	gin.DefaultWriter = log.Writer()
 
 	router := gin.Default()
 
