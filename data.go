@@ -69,7 +69,7 @@ func (job *Job) save(db *sqlx.DB) (sql.Result, error) {
 func getAllJobs(db *sqlx.DB) ([]Job, error) {
 	var jobs []Job
 
-	err := db.Select(&jobs, "SELECT * FROM jobs")
+	err := db.Select(&jobs, "SELECT * FROM jobs ORDER BY published_at DESC")
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return jobs, err
 	}
