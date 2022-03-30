@@ -20,6 +20,12 @@ $ docker compose up
 $ make psql
 ```
 
+## seed the database with test data
+
+```shell
+$ make seed-db
+```
+
 ## slack integration
 
 setting the `SLACK_HOOK` env var will enable posting new jobs to Slack to the provided Slack hook url. if not configured, this functionality will simply be disabled
