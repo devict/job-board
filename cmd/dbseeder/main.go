@@ -21,6 +21,10 @@ func main() {
 }
 
 func run() error {
+	if os.Getenv("APP_ENV") != "debug" {
+		return fmt.Errorf("must not run in environment: %q", os.Getenv("APP_ENV"))
+	}
+
 	db, err := sqlx.Open("postgres", fmt.Sprintf("%s%s", os.Getenv("DATABASE_URL"), "?sslmode=disable"))
 	if err != nil {
 		return fmt.Errorf("failed to sqlx.Open: %w", err)
