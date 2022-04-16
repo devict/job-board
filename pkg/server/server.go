@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"html/template"
 	"log"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/devict/job-board/pkg/config"
 	"github.com/devict/job-board/pkg/data"
+	"github.com/devict/job-board/pkg/services"
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -15,7 +17,13 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func NewServer(c config.Config, db *sqlx.DB) (http.Server, error) {
+func NewServer(
+	c config.Config,
+	db *sql.DB,
+	emailService services.IEmailService,
+	twitterService services.ITwitterService,
+	slackService services.ISlackService,
+) (http.Server, error) {
 	gin.SetMode(c.Env)
 	gin.DefaultWriter = log.Writer()
 
@@ -40,14 +48,16 @@ func NewServer(c config.Config, db *sqlx.DB) (http.Server, error) {
 	router.Static("/assets", "assets")
 	router.HTMLRender = renderer()
 
-	ctrl := &Controller{DB: db, Config: c}
+	sqlxDb := sqlx.NewDb(db, "postgres")
+
+	ctrl := &Controller{DB: sqlxDb, Config: c}
 	router.GET("/", ctrl.Index)
 	router.GET("/new", ctrl.NewJob)
 	router.POST("/jobs", ctrl.CreateJob)
 	router.GET("/jobs/:id", ctrl.ViewJob)
 
 	authorized := router.Group("/")
-	authorized.Use(requireAuth(db, c.AppSecret))
+	authorized.Use(requireAuth(sqlxDb, c.AppSecret))
 	{
 		authorized.GET("/jobs/:id/edit", ctrl.EditJob)
 		authorized.POST("/jobs/:id", ctrl.UpdateJob)
@@ -57,7 +67,6 @@ func NewServer(c config.Config, db *sqlx.DB) (http.Server, error) {
 		Addr:    c.Port,
 		Handler: router,
 	}, nil
-
 }
 
 func renderer() multitemplate.Renderer {

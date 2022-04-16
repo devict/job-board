@@ -15,8 +15,11 @@ import (
 )
 
 type Controller struct {
-	DB     *sqlx.DB
-	Config config.Config
+	DB             *sqlx.DB
+	EmailService   services.IEmailService
+	SlackService   services.ISlackService
+	TwitterService services.ITwitterService
+	Config         config.Config
 }
 
 func (ctrl *Controller) Index(ctx *gin.Context) {
@@ -108,7 +111,7 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 			"Your job has been created!\n\n<a href=\"%s\">Use this link to edit the job posting</a>",
 			signedJobRoute(job, ctrl.Config),
 		)
-		err = services.SendEmail(newJobInput.Email, "Job Created!", message, ctrl.Config.Email)
+		err = ctrl.EmailService.SendEmail(newJobInput.Email, "Job Created!", message)
 		if err != nil {
 			log.Println(fmt.Errorf("failed to sendEmail: %w", err))
 			// continuing...
@@ -116,14 +119,14 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 	}
 
 	if ctrl.Config.SlackHook != "" {
-		if err = services.PostToSlack(job, ctrl.Config); err != nil {
+		if err = ctrl.SlackService.PostToSlack(job); err != nil {
 			log.Println(fmt.Errorf("failed to postToSlack: %w", err))
 			// continuing...
 		}
 	}
 
 	if ctrl.Config.Twitter.AccessToken != "" {
-		if err = services.PostToTwitter(job, ctrl.Config); err != nil {
+		if err = ctrl.TwitterService.PostToTwitter(job); err != nil {
 			log.Println(fmt.Errorf("failed to postToTwitter: %w", err))
 			// continuing...
 		}
