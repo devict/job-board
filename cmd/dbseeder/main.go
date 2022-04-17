@@ -48,8 +48,8 @@ func run() error {
 		j := Job{
 			Position:     lorem.WordsRange(1, 3),
 			Organization: lorem.WordsRange(2, 4),
-			Url:          sql.NullString{String: lorem.URL(), Valid: i%20 == 0},
-			Description:  sql.NullString{String: lorem.ParagraphsN(3), Valid: i%40 == 0},
+			Url:          sql.NullString{String: lorem.URL(), Valid: i%20 != 0},
+			Description:  sql.NullString{String: lorem.ParagraphsN(3), Valid: i%40 != 0},
 			Email:        lorem.Email(),
 		}
 
