@@ -61,15 +61,18 @@ func run() error {
 		defer ticker.Stop()
 
 		for {
+			log.Println("removing old jobs")
+			_, err := db.Exec("DELETE FROM jobs WHERE published_at < NOW() - INTERVAL '30 DAYS'")
+			if err != nil {
+				log.Println(fmt.Errorf("error clearing old jobs: %w", err))
+			}
+
 			select {
 			case <-ctx.Done():
 				log.Println("shutting down old jobs background process")
 				return
 			case <-ticker.C:
-				_, err := db.Exec("DELETE FROM jobs WHERE published_at < NOW() - INTERVAL '30 DAYS'")
-				if err != nil {
-					log.Println(fmt.Errorf("error clearing old jobs: %w", err))
-				}
+				continue
 			}
 		}
 	}()
