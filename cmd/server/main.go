@@ -79,7 +79,7 @@ func run() error {
 	slackService := &services.SlackService{Conf: c}
 	twitterService := &services.TwitterService{Conf: c}
 
-	server, err := server.NewServer(c, db, emailService, twitterService, slackService)
+	server, err := server.NewServer(c, db, emailService, twitterService, slackService, "./templates")
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}

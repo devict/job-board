@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"path"
 
 	"github.com/devict/job-board/pkg/config"
 	"github.com/devict/job-board/pkg/data"
@@ -23,6 +24,7 @@ func NewServer(
 	emailService services.IEmailService,
 	twitterService services.ITwitterService,
 	slackService services.ISlackService,
+	templatePath string,
 ) (http.Server, error) {
 	gin.SetMode(c.Env)
 	gin.DefaultWriter = log.Writer()
@@ -46,7 +48,7 @@ func NewServer(
 	router.Use(sessions.Sessions("mysession", sessionStore))
 
 	router.Static("/assets", "assets")
-	router.HTMLRender = renderer()
+	router.HTMLRender = renderer(templatePath)
 
 	sqlxDb := sqlx.NewDb(db, "postgres")
 
@@ -69,17 +71,19 @@ func NewServer(
 	}, nil
 }
 
-func renderer() multitemplate.Renderer {
+func renderer(templatePath string) multitemplate.Renderer {
 	funcMap := template.FuncMap{
 		"formatAsDate":          formatAsDate,
 		"formatAsRfc3339String": formatAsRfc3339String,
 	}
 
+	basePath := path.Join(templatePath, "base.html")
+
 	r := multitemplate.NewRenderer()
-	r.AddFromFilesFuncs("index", funcMap, "./templates/base.html", "./templates/index.html")
-	r.AddFromFilesFuncs("new", funcMap, "./templates/base.html", "./templates/new.html")
-	r.AddFromFilesFuncs("edit", funcMap, "./templates/base.html", "./templates/edit.html")
-	r.AddFromFilesFuncs("view", funcMap, "./templates/base.html", "./templates/view.html")
+	r.AddFromFilesFuncs("index", funcMap, basePath, path.Join(templatePath, "index.html"))
+	r.AddFromFilesFuncs("new", funcMap, basePath, path.Join(templatePath, "new.html"))
+	r.AddFromFilesFuncs("edit", funcMap, basePath, path.Join(templatePath, "edit.html"))
+	r.AddFromFilesFuncs("view", funcMap, basePath, path.Join(templatePath, "view.html"))
 
 	return r
 }
