@@ -18,15 +18,17 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func NewServer(
-	c config.Config,
-	db *sql.DB,
-	emailService services.IEmailService,
-	twitterService services.ITwitterService,
-	slackService services.ISlackService,
-	templatePath string,
-) (http.Server, error) {
-	gin.SetMode(c.Env)
+type ServerConfig struct {
+	Config         config.Config
+	DB             *sql.DB
+	EmailService   services.IEmailService
+	TwitterService services.ITwitterService
+	SlackService   services.ISlackService
+	TemplatePath   string
+}
+
+func NewServer(c ServerConfig) (http.Server, error) {
+	gin.SetMode(c.Config.Env)
 	gin.DefaultWriter = log.Writer()
 
 	router := gin.Default()
@@ -38,35 +40,35 @@ func NewServer(
 	sessionOpts := sessions.Options{
 		Path:     "/",
 		MaxAge:   24 * 60, // 1 day
-		Secure:   c.Env != "debug",
+		Secure:   c.Config.Env != "debug",
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 	}
 
-	sessionStore := cookie.NewStore([]byte(c.AppSecret))
+	sessionStore := cookie.NewStore([]byte(c.Config.AppSecret))
 	sessionStore.Options(sessionOpts)
 	router.Use(sessions.Sessions("mysession", sessionStore))
 
 	router.Static("/assets", "assets")
-	router.HTMLRender = renderer(templatePath)
+	router.HTMLRender = renderer(c.TemplatePath)
 
-	sqlxDb := sqlx.NewDb(db, "postgres")
+	sqlxDb := sqlx.NewDb(c.DB, "postgres")
 
-	ctrl := &Controller{DB: sqlxDb, Config: c}
+	ctrl := &Controller{DB: sqlxDb, Config: c.Config}
 	router.GET("/", ctrl.Index)
 	router.GET("/new", ctrl.NewJob)
 	router.POST("/jobs", ctrl.CreateJob)
 	router.GET("/jobs/:id", ctrl.ViewJob)
 
 	authorized := router.Group("/")
-	authorized.Use(requireAuth(sqlxDb, c.AppSecret))
+	authorized.Use(requireAuth(sqlxDb, c.Config.AppSecret))
 	{
 		authorized.GET("/jobs/:id/edit", ctrl.EditJob)
 		authorized.POST("/jobs/:id", ctrl.UpdateJob)
 	}
 
 	return http.Server{
-		Addr:    c.Port,
+		Addr:    c.Config.Port,
 		Handler: router,
 	}, nil
 }

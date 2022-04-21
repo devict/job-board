@@ -55,7 +55,16 @@ func makeServer(t *testing.T) (*httptest.Server, *mockService, sqlmock.Sqlmock) 
 	assert.NoError(t, err)
 
 	svc := &mockService{}
-	s, err := server.NewServer(config.Config{AppSecret: "sup"}, db, svc, svc, svc, "../../templates")
+	s, err := server.NewServer(
+		server.ServerConfig{
+			Config:         config.Config{AppSecret: "sup"},
+			DB:             db,
+			EmailService:   svc,
+			TwitterService: svc,
+			SlackService:   svc,
+			TemplatePath:   "../../templates",
+		},
+	)
 	assert.NoError(t, err)
 
 	testServer := httptest.NewServer(s.Handler)

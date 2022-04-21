@@ -75,11 +75,16 @@ func run() error {
 		}
 	}()
 
-	emailService := &services.EmailService{Conf: c.Email}
-	slackService := &services.SlackService{Conf: c}
-	twitterService := &services.TwitterService{Conf: c}
+	conf := server.ServerConfig{
+		Config:         c,
+		DB:             db,
+		EmailService:   &services.EmailService{Conf: c.Email},
+		TwitterService: &services.TwitterService{Conf: c},
+		SlackService:   &services.SlackService{Conf: c},
+		TemplatePath:   "./templates",
+	}
 
-	server, err := server.NewServer(c, db, emailService, twitterService, slackService, "./templates")
+	server, err := server.NewServer(conf)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}
