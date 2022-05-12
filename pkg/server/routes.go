@@ -105,7 +105,7 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 		return
 	}
 
-	if ctrl.Config.Email.SMTPHost != "" {
+	if ctrl.EmailService != nil {
 		// TODO: make this a nicer html template?
 		message := fmt.Sprintf(
 			"Your job has been created!\n\n<a href=\"%s\">Use this link to edit the job posting</a>",
@@ -118,14 +118,14 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 		}
 	}
 
-	if ctrl.Config.SlackHook != "" {
+	if ctrl.SlackService != nil {
 		if err = ctrl.SlackService.PostToSlack(job); err != nil {
 			log.Println(fmt.Errorf("failed to postToSlack: %w", err))
 			// continuing...
 		}
 	}
 
-	if ctrl.Config.Twitter.AccessToken != "" {
+	if ctrl.TwitterService != nil {
 		if err = ctrl.TwitterService.PostToTwitter(job); err != nil {
 			log.Println(fmt.Errorf("failed to postToTwitter: %w", err))
 			// continuing...

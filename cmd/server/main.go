@@ -76,12 +76,21 @@ func run() error {
 	}()
 
 	conf := server.ServerConfig{
-		Config:         c,
-		DB:             db,
-		EmailService:   &services.EmailService{Conf: c.Email},
-		TwitterService: &services.TwitterService{Conf: c},
-		SlackService:   &services.SlackService{Conf: c},
-		TemplatePath:   "./templates",
+		Config:       c,
+		DB:           db,
+		TemplatePath: "./templates",
+	}
+
+	if c.Email.SMTPHost != "" {
+		conf.EmailService = &services.EmailService{Conf: c.Email}
+	}
+
+	if c.SlackHook != "" {
+		conf.SlackService = &services.SlackService{Conf: c}
+	}
+
+	if c.Twitter.APIKey != "" {
+		conf.TwitterService = &services.TwitterService{Conf: c}
 	}
 
 	server, err := server.NewServer(conf)
