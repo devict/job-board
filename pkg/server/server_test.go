@@ -95,6 +95,16 @@ func TestCreateJob(t *testing.T) {
 			},
 			expectSuccess: true,
 		},
+		{
+			values: map[string][]string{
+				"position":     {"Pos"},
+				"organization": {"Org"},
+				"description":  {"Super rad place to work"},
+				"url":          {""},
+				"email":        {"test@example.com"},
+			},
+			expectSuccess: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -142,6 +152,7 @@ func TestCreateJob(t *testing.T) {
 			// TODO: failure scenario
 		}
 
+		resetServiceMock(svcmock)
 	}
 
 	// - post some form data to the create job page
@@ -254,6 +265,12 @@ func sendRequest(t *testing.T, path string, postBody []byte) (string, *http.Resp
 	resp.Body.Close()
 
 	return string(body), resp
+}
+
+func resetServiceMock(svc *mockService) {
+	svc.emails = []email{}
+	svc.tweets = []data.Job{}
+	svc.slacks = []data.Job{}
 }
 
 func getDbFields(thing interface{}) []string {
