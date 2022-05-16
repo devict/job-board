@@ -1,12 +1,14 @@
 package server_test
 
 import (
+	"bytes"
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"regexp"
 	"testing"
@@ -31,7 +33,7 @@ func TestIndex(t *testing.T) {
 		AddRow(mockJobRow(data.Job{Position: "Pos 2"})...)
 	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(rows)
 
-	body, _ := sendRequest(t, s.URL)
+	body, _ := sendRequest(t, s.URL, nil)
 
 	assert.Contains(t, string(body), "Pos 1")
 	assert.Contains(t, string(body), "Pos 2")
@@ -43,7 +45,7 @@ func TestNewJob(t *testing.T) {
 	s, _, _ := makeServer(t)
 	defer s.Close()
 
-	body, _ := sendRequest(t, fmt.Sprintf("%s/new", s.URL))
+	body, _ := sendRequest(t, fmt.Sprintf("%s/new", s.URL), nil)
 
 	// - assert that all the right fields are present
 	tests := []struct {
@@ -70,12 +72,74 @@ func TestNewJob(t *testing.T) {
 		}
 
 		r := fmt.Sprintf(`<%s.+name="%s".*%s>`, base, tt.field, reqStr)
-		assert.Regexp(t, regexp.MustCompile(r), string(body))
+		assert.Regexp(t, regexp.MustCompile(r), body)
 	}
 }
 
 func TestCreateJob(t *testing.T) {
-	// TODO
+	s, svcmock, dbmock := makeServer(t)
+	defer s.Close()
+
+	tests := []struct {
+		values        map[string][]string
+		expectSuccess bool
+		// TODO: what else should I expect?
+	}{
+		{
+			values: map[string][]string{
+				"position":     {"Pos"},
+				"organization": {"Org"},
+				"description":  {""},
+				"url":          {"https://devict.org"},
+				"email":        {"test@example.com"},
+			},
+			expectSuccess: true,
+		},
+	}
+
+	for _, tt := range tests {
+		newJob := data.Job{
+			Position:     tt.values["position"][0],
+			Organization: tt.values["organization"][0],
+			Description:  sql.NullString{String: tt.values["description"][0], Valid: true},
+			Url:          sql.NullString{String: tt.values["url"][0], Valid: true},
+			Email:        tt.values["email"][0],
+		}
+
+		if tt.expectSuccess {
+			dbmock.ExpectQuery(`INSERT INTO jobs`).WillReturnRows(
+				sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(newJob)...),
+			)
+
+			expectHomeQuery(dbmock, []data.Job{newJob})
+		}
+
+		reqBody := url.Values(tt.values).Encode()
+		_, resp := sendRequest(t, fmt.Sprintf("%s%s", s.URL, "/jobs"), []byte(reqBody))
+
+		assert.Equal(t, 200, resp.StatusCode)
+
+		if tt.expectSuccess {
+			expectHomeQuery(dbmock, []data.Job{newJob})
+
+			homeBody, _ := sendRequest(t, s.URL, nil)
+			assert.Contains(t, homeBody, tt.values["position"][0])
+			assert.Contains(t, homeBody, tt.values["organization"][0])
+
+			// TODO: assert email
+			assert.Equal(t, 1, len(svcmock.emails))
+			assert.Equal(t, "Job Created!", svcmock.emails[0].subject)
+			assert.Equal(t, tt.values["email"][0], svcmock.emails[0].recipient)
+			// assert.Contains(t, svcmock.emails[0].body, "token=") // TODO: test valid token value
+
+			// TODO: assert tweet
+			// TODO: assert slack
+			// } else {
+			// TODO: failure scenario
+		}
+
+	}
+
 	// - post some form data to the create job page
 	// - assert the right sql insert query is called
 	// - assert email sent
@@ -148,7 +212,7 @@ func makeServer(t *testing.T) (*httptest.Server, *mockService, sqlmock.Sqlmock) 
 
 	svc := &mockService{}
 	s, err := server.NewServer(
-		server.ServerConfig{
+		&server.ServerConfig{
 			Config:         config.Config{AppSecret: "sup"},
 			DB:             db,
 			EmailService:   svc,
@@ -160,11 +224,20 @@ func makeServer(t *testing.T) (*httptest.Server, *mockService, sqlmock.Sqlmock) 
 	assert.NoError(t, err)
 
 	testServer := httptest.NewServer(s.Handler)
+
 	return testServer, svc, dbmock
 }
 
-func sendRequest(t *testing.T, path string) ([]byte, *http.Response) {
-	resp, err := http.Get(path)
+func sendRequest(t *testing.T, path string, postBody []byte) (string, *http.Response) {
+	var resp *http.Response
+	var err error
+
+	if postBody == nil {
+		resp, err = http.Get(path)
+	} else {
+		resp, err = http.Post(path, "application/x-www-form-urlencoded", bytes.NewReader(postBody))
+	}
+
 	assert.NoError(t, err)
 	assert.Equal(t, resp.StatusCode, 200)
 
@@ -172,7 +245,7 @@ func sendRequest(t *testing.T, path string) ([]byte, *http.Response) {
 	assert.NoError(t, err)
 	resp.Body.Close()
 
-	return body, resp
+	return string(body), resp
 }
 
 func getDbFields(thing interface{}) []string {
@@ -230,4 +303,12 @@ func mockJobRow(job data.Job) []driver.Value {
 	}
 
 	return vals
+}
+
+func expectHomeQuery(dbmock sqlmock.Sqlmock, jobs []data.Job) {
+	rows := sqlmock.NewRows(getDbFields(data.Job{}))
+	for _, job := range jobs {
+		rows.AddRow(mockJobRow(job)...)
+	}
+	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(rows)
 }
