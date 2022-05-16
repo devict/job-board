@@ -25,7 +25,7 @@ import (
 // - job deleted after 30 days?
 
 func TestIndex(t *testing.T) {
-	s, _, dbmock := makeServer(t)
+	s, _, dbmock, _ := makeServer(t)
 	defer s.Close()
 
 	rows := sqlmock.NewRows(getDbFields(data.Job{})).
@@ -42,7 +42,7 @@ func TestIndex(t *testing.T) {
 }
 
 func TestNewJob(t *testing.T) {
-	s, _, _ := makeServer(t)
+	s, _, _, _ := makeServer(t)
 	defer s.Close()
 
 	body, _ := sendRequest(t, fmt.Sprintf("%s/new", s.URL), nil)
@@ -77,7 +77,7 @@ func TestNewJob(t *testing.T) {
 }
 
 func TestCreateJob(t *testing.T) {
-	s, svcmock, dbmock := makeServer(t)
+	s, svcmock, dbmock, conf := makeServer(t)
 	defer s.Close()
 
 	tests := []struct {
@@ -99,11 +99,13 @@ func TestCreateJob(t *testing.T) {
 
 	for _, tt := range tests {
 		newJob := data.Job{
+			ID:           "1",
 			Position:     tt.values["position"][0],
 			Organization: tt.values["organization"][0],
 			Description:  sql.NullString{String: tt.values["description"][0], Valid: true},
 			Url:          sql.NullString{String: tt.values["url"][0], Valid: true},
 			Email:        tt.values["email"][0],
+			PublishedAt:  time.Now(),
 		}
 
 		if tt.expectSuccess {
@@ -130,7 +132,7 @@ func TestCreateJob(t *testing.T) {
 			assert.Equal(t, 1, len(svcmock.emails))
 			assert.Equal(t, "Job Created!", svcmock.emails[0].subject)
 			assert.Equal(t, tt.values["email"][0], svcmock.emails[0].recipient)
-			// assert.Contains(t, svcmock.emails[0].body, "token=") // TODO: test valid token value
+			assert.Contains(t, svcmock.emails[0].body, server.SignedJobRoute(newJob, conf))
 
 			// TODO: assert tweet
 			// TODO: assert slack
@@ -206,14 +208,16 @@ func (svc *mockService) PostToSlack(job data.Job) error {
 	return nil
 }
 
-func makeServer(t *testing.T) (*httptest.Server, *mockService, sqlmock.Sqlmock) {
+func makeServer(t *testing.T) (*httptest.Server, *mockService, sqlmock.Sqlmock, *config.Config) {
 	db, dbmock, err := sqlmock.New()
 	assert.NoError(t, err)
+
+	conf := &config.Config{AppSecret: "sup"}
 
 	svc := &mockService{}
 	s, err := server.NewServer(
 		&server.ServerConfig{
-			Config:         config.Config{AppSecret: "sup"},
+			Config:         conf,
 			DB:             db,
 			EmailService:   svc,
 			TwitterService: svc,
@@ -225,7 +229,9 @@ func makeServer(t *testing.T) (*httptest.Server, *mockService, sqlmock.Sqlmock) 
 
 	testServer := httptest.NewServer(s.Handler)
 
-	return testServer, svc, dbmock
+	conf.URL = testServer.URL
+
+	return testServer, svc, dbmock, conf
 }
 
 func sendRequest(t *testing.T, path string, postBody []byte) (string, *http.Response) {

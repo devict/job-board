@@ -109,7 +109,7 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 		// TODO: make this a nicer html template?
 		message := fmt.Sprintf(
 			"Your job has been created!\n\n<a href=\"%s\">Use this link to edit the job posting</a>",
-			signedJobRoute(job, ctrl.Config),
+			SignedJobRoute(job, ctrl.Config),
 		)
 		err = ctrl.EmailService.SendEmail(newJobInput.Email, "Job Created!", message)
 		if err != nil {
