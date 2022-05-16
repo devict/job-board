@@ -128,15 +128,17 @@ func TestCreateJob(t *testing.T) {
 			assert.Contains(t, homeBody, tt.values["position"][0])
 			assert.Contains(t, homeBody, tt.values["organization"][0])
 
-			// TODO: assert email
 			assert.Equal(t, 1, len(svcmock.emails))
+			assert.Equal(t, 1, len(svcmock.tweets))
+			assert.Equal(t, 1, len(svcmock.slacks))
+
 			assert.Equal(t, "Job Created!", svcmock.emails[0].subject)
 			assert.Equal(t, tt.values["email"][0], svcmock.emails[0].recipient)
 			assert.Contains(t, svcmock.emails[0].body, server.SignedJobRoute(newJob, conf))
 
-			// TODO: assert tweet
-			// TODO: assert slack
-			// } else {
+			assert.Contains(t, svcmock.tweets, newJob)
+			assert.Contains(t, svcmock.slacks, newJob)
+		} else {
 			// TODO: failure scenario
 		}
 
