@@ -75,7 +75,7 @@ func run() error {
 		}
 	}()
 
-	conf := server.ServerConfig{
+	conf := &server.ServerConfig{
 		Config:       c,
 		DB:           db,
 		TemplatePath: "./templates",

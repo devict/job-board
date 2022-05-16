@@ -27,7 +27,7 @@ type ServerConfig struct {
 	TemplatePath   string
 }
 
-func NewServer(c ServerConfig) (http.Server, error) {
+func NewServer(c *ServerConfig) (http.Server, error) {
 	gin.SetMode(c.Config.Env)
 	gin.DefaultWriter = log.Writer()
 
@@ -54,7 +54,13 @@ func NewServer(c ServerConfig) (http.Server, error) {
 
 	sqlxDb := sqlx.NewDb(c.DB, "postgres")
 
-	ctrl := &Controller{DB: sqlxDb, Config: c.Config}
+	ctrl := &Controller{
+		DB:             sqlxDb,
+		Config:         c.Config,
+		EmailService:   c.EmailService,
+		SlackService:   c.SlackService,
+		TwitterService: c.TwitterService,
+	}
 	router.GET("/", ctrl.Index)
 	router.GET("/new", ctrl.NewJob)
 	router.POST("/jobs", ctrl.CreateJob)
