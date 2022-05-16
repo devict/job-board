@@ -13,7 +13,7 @@ type IEmailService interface {
 }
 
 type EmailService struct {
-	Conf config.EmailConfig
+	Conf *config.EmailConfig
 }
 
 func (svc *EmailService) SendEmail(recipient, subject, body string) error {

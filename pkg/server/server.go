@@ -19,7 +19,7 @@ import (
 )
 
 type ServerConfig struct {
-	Config         config.Config
+	Config         *config.Config
 	DB             *sql.DB
 	EmailService   services.IEmailService
 	TwitterService services.ITwitterService

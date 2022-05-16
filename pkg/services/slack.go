@@ -15,7 +15,7 @@ type ISlackService interface {
 }
 
 type SlackService struct {
-	Conf config.Config
+	Conf *config.Config
 }
 
 type SlackMessage struct {
@@ -37,7 +37,7 @@ func (svc *SlackService) PostToSlack(job data.Job) error {
 	return nil
 }
 
-func slackMessageFromJob(job data.Job, c config.Config) SlackMessage {
+func slackMessageFromJob(job data.Job, c *config.Config) SlackMessage {
 	text := fmt.Sprintf(
 		"A new job was posted!\n> *<%s/jobs/%s|%s @ %s>*",
 		c.URL,

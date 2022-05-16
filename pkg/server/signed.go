@@ -25,7 +25,7 @@ func signatureForJob(job data.Job, secret string) string {
 	return string(base64.URLEncoding.EncodeToString(hash.Sum(nil)))
 }
 
-func signedJobRoute(job data.Job, c config.Config) string {
+func signedJobRoute(job data.Job, c *config.Config) string {
 	return fmt.Sprintf(
 		"%s/jobs/%s/edit?token=%s",
 		c.URL,

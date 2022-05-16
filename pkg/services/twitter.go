@@ -14,7 +14,7 @@ type ITwitterService interface {
 }
 
 type TwitterService struct {
-	Conf config.Config
+	Conf *config.Config
 }
 
 func (svc *TwitterService) PostToTwitter(job data.Job) error {
@@ -38,7 +38,7 @@ func (svc *TwitterService) PostToTwitter(job data.Job) error {
 	return nil
 }
 
-func tweetFromJob(job data.Job, c config.Config) string {
+func tweetFromJob(job data.Job, c *config.Config) string {
 	return fmt.Sprintf(
 		"A job was posted! -- %s at %s\n\nMore info at %s/jobs/%s",
 		job.Position,

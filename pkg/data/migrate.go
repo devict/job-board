@@ -11,7 +11,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func Migrate(c config.Config) error {
+func Migrate(c *config.Config) error {
 	m, err := migrate.New("file://sql", c.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("failed to migrate.New: %w", err)

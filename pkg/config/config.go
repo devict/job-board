@@ -13,8 +13,8 @@ type Config struct {
 	Env         string `envconfig:"APP_ENV" required:"true" default:"debug"`
 	AppSecret   string `envconfig:"APP_SECRET" required:"true"`
 	DatabaseURL string `envconfig:"DATABASE_URL" required:"true"`
-	Email       EmailConfig
-	Twitter     TwitterConfig
+	Email       *EmailConfig
+	Twitter     *TwitterConfig
 	SlackHook   string `envconfig:"SLACK_HOOK"`
 }
 
@@ -32,11 +32,11 @@ type TwitterConfig struct {
 	APISecretKey      string `envconfig:"TW_API_SECRET_KEY"`
 }
 
-func LoadConfig() (Config, error) {
+func LoadConfig() (*Config, error) {
 	var config Config
 
 	if err := envconfig.Process("", &config); err != nil {
-		return config, err
+		return &config, err
 	}
 
 	if !strings.Contains(config.DatabaseURL, "sslmode=disable") {
@@ -47,5 +47,5 @@ func LoadConfig() (Config, error) {
 		config.Port = ":" + config.Port
 	}
 
-	return config, nil
+	return &config, nil
 }

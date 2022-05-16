@@ -19,7 +19,7 @@ type Controller struct {
 	EmailService   services.IEmailService
 	SlackService   services.ISlackService
 	TwitterService services.ITwitterService
-	Config         config.Config
+	Config         *config.Config
 }
 
 func (ctrl *Controller) Index(ctx *gin.Context) {
