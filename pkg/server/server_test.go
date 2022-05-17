@@ -152,7 +152,7 @@ func TestCreateJob(t *testing.T) {
 		}
 
 		reqBody := url.Values(tt.values).Encode()
-		respBody, _ := sendRequest(t, fmt.Sprintf("%s%s", s.URL, "/jobs"), []byte(reqBody))
+		respBody, _ := sendRequest(t, fmt.Sprintf("%s/jobs", s.URL), []byte(reqBody))
 
 		if tt.expectSuccess {
 			assert.Contains(t, respBody, tt.values["position"][0])
@@ -182,10 +182,54 @@ func TestCreateJob(t *testing.T) {
 }
 
 func TestViewJob(t *testing.T) {
-	// TODO
-	// - view job page
-	// - assert right SQL query is called
-	// - assert all the right data is displayed
+	s, _, dbmock, _ := makeServer(t)
+	defer s.Close()
+
+	tests := []struct {
+		job data.Job
+	}{
+		{
+			job: data.Job{
+				ID:           "1",
+				Position:     "Pos",
+				Organization: "Org",
+				Description:  sql.NullString{String: "Coolest job eva", Valid: true},
+				Url:          sql.NullString{},
+				Email:        "test@example.com",
+			},
+		},
+		{
+			job: data.Job{
+				ID:           "2",
+				Position:     "Pos 2",
+				Organization: "Org 2",
+				Description:  sql.NullString{},
+				Url:          sql.NullString{String: "https://devict.org", Valid: true},
+				Email:        "test@example.com",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
+			sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(tt.job)...),
+		)
+
+		respBody, _ := sendRequest(t, fmt.Sprintf("%s/jobs/%s", s.URL, tt.job.ID), nil)
+
+		assert.Contains(t, respBody, tt.job.Position)
+		assert.Contains(t, respBody, tt.job.Organization)
+
+		if tt.job.Description.Valid {
+			assert.Contains(t, respBody, tt.job.Description.String)
+		}
+
+		if tt.job.Url.Valid {
+			assert.Contains(t, respBody, tt.job.Url.String)
+		}
+
+		assert.NotContains(t, respBody, tt.job.Email) // Don't expose the email!
+	}
 }
 
 func TestEditJobUnauthorized(t *testing.T) {
