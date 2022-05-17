@@ -24,6 +24,15 @@ type Job struct {
 	PublishedAt  time.Time      `db:"published_at"`
 }
 
+const (
+	ErrNoPosition         = "Must provide a Position"
+	ErrNoOrganization     = "Must provide a Organization"
+	ErrNoEmail            = "Must provide an Email Address"
+	ErrInvalidUrl         = "Must provide a valid Url"
+	ErrInvalidEmail       = "Must provide a valid Email"
+	ErrNoUrlOrDescription = "Must provide either a Url or a Description"
+)
+
 func (job *Job) Update(newParams NewJob) {
 	job.Position = newParams.Position
 	job.Organization = newParams.Organization
@@ -100,31 +109,27 @@ func (newJob *NewJob) Validate(update bool) map[string]string {
 	errs := make(map[string]string)
 
 	if newJob.Position == "" {
-		errs["position"] = "Must provide a Position"
+		errs["position"] = ErrNoPosition
 	}
 
 	if newJob.Organization == "" {
-		errs["organization"] = "Must provide a Organization"
+		errs["organization"] = ErrNoOrganization
 	}
 
 	if newJob.Url == "" && newJob.Description == "" {
-		errs["url"] = "Must provide either a Url or a Description"
-	}
-
-	if newJob.Description == "" {
+		errs["url"] = ErrNoUrlOrDescription
+	} else if newJob.Description == "" {
 		if _, err := url.ParseRequestURI(newJob.Url); err != nil {
-			errs["url"] = "Must provide a valid Url"
+			errs["url"] = ErrInvalidUrl
 		}
 	}
 
 	if !update {
 		if newJob.Email == "" {
-			errs["email"] = "Must provide an Email Address"
-		}
-
-		// TODO: Maybe do more than just validate email format?
-		if _, err := mail.ParseAddress(newJob.Email); err != nil {
-			errs["email"] = "Must provide a valid Email"
+			errs["email"] = ErrNoEmail
+		} else if _, err := mail.ParseAddress(newJob.Email); err != nil {
+			// TODO: Maybe do more than just validate email format?
+			errs["email"] = ErrInvalidEmail
 		}
 	}
 

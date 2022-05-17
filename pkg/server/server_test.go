@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
@@ -19,6 +20,7 @@ import (
 	"github.com/devict/job-board/pkg/data"
 	"github.com/devict/job-board/pkg/server"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/publicsuffix"
 )
 
 // Things to test:
@@ -81,8 +83,9 @@ func TestCreateJob(t *testing.T) {
 	defer s.Close()
 
 	tests := []struct {
-		values        map[string][]string
-		expectSuccess bool
+		values            map[string][]string
+		expectSuccess     bool
+		expectErrMessages []string
 		// TODO: what else should I expect?
 	}{
 		{
@@ -104,6 +107,28 @@ func TestCreateJob(t *testing.T) {
 				"email":        {"test@example.com"},
 			},
 			expectSuccess: true,
+		},
+		{
+			values: map[string][]string{
+				"position":     {"Pos"},
+				"organization": {"Org"},
+				"description":  {""},
+				"url":          {""},
+				"email":        {"test@example.com"},
+			},
+			expectSuccess:     false,
+			expectErrMessages: []string{data.ErrNoUrlOrDescription},
+		},
+		{
+			values: map[string][]string{
+				"position":     {"Pos"},
+				"organization": {"Org"},
+				"description":  {"Cool cool cool"},
+				"url":          {""},
+				"email":        {""},
+			},
+			expectSuccess:     false,
+			expectErrMessages: []string{data.ErrNoEmail},
 		},
 	}
 
@@ -127,16 +152,11 @@ func TestCreateJob(t *testing.T) {
 		}
 
 		reqBody := url.Values(tt.values).Encode()
-		_, resp := sendRequest(t, fmt.Sprintf("%s%s", s.URL, "/jobs"), []byte(reqBody))
-
-		assert.Equal(t, 200, resp.StatusCode)
+		respBody, _ := sendRequest(t, fmt.Sprintf("%s%s", s.URL, "/jobs"), []byte(reqBody))
 
 		if tt.expectSuccess {
-			expectHomeQuery(dbmock, []data.Job{newJob})
-
-			homeBody, _ := sendRequest(t, s.URL, nil)
-			assert.Contains(t, homeBody, tt.values["position"][0])
-			assert.Contains(t, homeBody, tt.values["organization"][0])
+			assert.Contains(t, respBody, tt.values["position"][0])
+			assert.Contains(t, respBody, tt.values["organization"][0])
 
 			assert.Equal(t, 1, len(svcmock.emails))
 			assert.Equal(t, 1, len(svcmock.tweets))
@@ -149,7 +169,9 @@ func TestCreateJob(t *testing.T) {
 			assert.Contains(t, svcmock.tweets, newJob)
 			assert.Contains(t, svcmock.slacks, newJob)
 		} else {
-			// TODO: failure scenario
+			for _, errMsg := range tt.expectErrMessages {
+				assert.Contains(t, respBody, errMsg)
+			}
 		}
 
 		resetServiceMock(svcmock)
@@ -225,9 +247,9 @@ func makeServer(t *testing.T) (*httptest.Server, *mockService, sqlmock.Sqlmock, 
 	db, dbmock, err := sqlmock.New()
 	assert.NoError(t, err)
 
-	conf := &config.Config{AppSecret: "sup"}
-
+	conf := &config.Config{AppSecret: "sup", Env: "debug"}
 	svc := &mockService{}
+
 	s, err := server.NewServer(
 		&server.ServerConfig{
 			Config:         conf,
@@ -241,7 +263,6 @@ func makeServer(t *testing.T) (*httptest.Server, *mockService, sqlmock.Sqlmock, 
 	assert.NoError(t, err)
 
 	testServer := httptest.NewServer(s.Handler)
-
 	conf.URL = testServer.URL
 
 	return testServer, svc, dbmock, conf
@@ -251,10 +272,17 @@ func sendRequest(t *testing.T, path string, postBody []byte) (string, *http.Resp
 	var resp *http.Response
 	var err error
 
+	// We need a cookie jar so cookies are retained between redirects
+	cookieJar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	assert.NoError(t, err)
+
+	client := http.Client{Jar: cookieJar}
+
 	if postBody == nil {
-		resp, err = http.Get(path)
+		resp, err = client.Get(path)
 	} else {
-		resp, err = http.Post(path, "application/x-www-form-urlencoded", bytes.NewReader(postBody))
+		// TODO: switch this to client.PostForm to simplify
+		resp, err = client.Post(path, "application/x-www-form-urlencoded", bytes.NewReader(postBody))
 	}
 
 	assert.NoError(t, err)
