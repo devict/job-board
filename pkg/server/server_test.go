@@ -47,7 +47,9 @@ func TestNewJob(t *testing.T) {
 	s, _, _, _ := makeServer(t)
 	defer s.Close()
 
-	body, _ := sendRequest(t, fmt.Sprintf("%s/new", s.URL), nil)
+	body, resp := sendRequest(t, fmt.Sprintf("%s/new", s.URL), nil)
+
+	assert.Equal(t, 200, resp.StatusCode)
 
 	// - assert that all the right fields are present
 	tests := []struct {
@@ -86,7 +88,6 @@ func TestCreateJob(t *testing.T) {
 		values            map[string][]string
 		expectSuccess     bool
 		expectErrMessages []string
-		// TODO: what else should I expect?
 	}{
 		{
 			values: map[string][]string{
@@ -152,7 +153,10 @@ func TestCreateJob(t *testing.T) {
 		}
 
 		reqBody := url.Values(tt.values).Encode()
-		respBody, _ := sendRequest(t, fmt.Sprintf("%s/jobs", s.URL), []byte(reqBody))
+		respBody, resp := sendRequest(t, fmt.Sprintf("%s/jobs", s.URL), []byte(reqBody))
+
+		// Should follow the redirect and result in a 200 regardless of success/failure
+		assert.Equal(t, 200, resp.StatusCode)
 
 		if tt.expectSuccess {
 			assert.Contains(t, respBody, tt.values["position"][0])
@@ -215,8 +219,9 @@ func TestViewJob(t *testing.T) {
 			sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(tt.job)...),
 		)
 
-		respBody, _ := sendRequest(t, fmt.Sprintf("%s/jobs/%s", s.URL, tt.job.ID), nil)
+		respBody, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s", s.URL, tt.job.ID), nil)
 
+		assert.Equal(t, 200, resp.StatusCode)
 		assert.Contains(t, respBody, tt.job.Position)
 		assert.Contains(t, respBody, tt.job.Organization)
 
@@ -233,9 +238,16 @@ func TestViewJob(t *testing.T) {
 }
 
 func TestEditJobUnauthorized(t *testing.T) {
-	// TODO
-	// - attempt to go to edit job link
-	// - assert unauthorized response
+	s, _, dbmock, _ := makeServer(t)
+
+	job := data.Job{ID: "1", PublishedAt: time.Now()}
+
+	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
+		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
+	)
+
+	_, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s/edit?token=incorrect", s.URL, job.ID), nil)
+	assert.Equal(t, 403, resp.StatusCode)
 }
 
 func TestUpdateJobUnauthorized(t *testing.T) {
@@ -328,12 +340,12 @@ func sendRequest(t *testing.T, path string, postBody []byte) (string, *http.Resp
 	}
 
 	assert.NoError(t, err)
-	assert.Equal(t, resp.StatusCode, 200)
 
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	resp.Body.Close()
 
+	time.Sleep(1 * time.Millisecond) // Makes sure the resp object is populated properly
 	return string(body), resp
 }
 
