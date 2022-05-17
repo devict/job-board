@@ -264,10 +264,34 @@ func TestUpdateJobUnauthorized(t *testing.T) {
 }
 
 func TestEditJobAuthorized(t *testing.T) {
-	// TODO
-	// - go to edit job page with proper token
-	// - assert the select sql query
-	// - assert the fields and pre-populated values
+	_, _, dbmock, conf := makeServer(t)
+
+	job := data.Job{
+		Position:     "A position",
+		Organization: "An organization",
+		Description:  sql.NullString{String: "A description", Valid: true},
+		ID:           "1",
+		Email:        "secret@secret.com",
+		PublishedAt:  time.Now(),
+	}
+
+	// Query executes twice, once for the auth middleware, and
+	// a second time for the actual route
+	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
+		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
+	)
+	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
+		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
+	)
+
+	signedEditRoute := server.SignedJobRoute(job, conf)
+	respBody, resp := sendRequest(t, signedEditRoute, nil)
+
+	assert.Equal(t, 200, resp.StatusCode)
+
+	assert.Regexp(t, fmt.Sprintf(`<input.+name="position".*value="%s".*>`, job.Position), respBody)
+	assert.Regexp(t, fmt.Sprintf(`<input.+name="organization".*value="%s".*>`, job.Organization), respBody)
+	assert.Regexp(t, fmt.Sprintf(`<textarea.+name="description".*>%s</textarea>`, job.Description.String), respBody)
 }
 
 func TestUpdateJobAuthorized(t *testing.T) {
