@@ -251,9 +251,16 @@ func TestEditJobUnauthorized(t *testing.T) {
 }
 
 func TestUpdateJobUnauthorized(t *testing.T) {
-	// TODO
-	// - attempt to post to update job link
-	// - assert unauthorized response
+	s, _, dbmock, _ := makeServer(t)
+
+	job := data.Job{ID: "1", PublishedAt: time.Now()}
+
+	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
+		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
+	)
+
+	_, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s?token=incorrect", s.URL, job.ID), []byte("daaaata"))
+	assert.Equal(t, 403, resp.StatusCode)
 }
 
 func TestEditJobAuthorized(t *testing.T) {
