@@ -172,15 +172,13 @@ func TestCreateJob(t *testing.T) {
 			for _, errMsg := range tt.expectErrMessages {
 				assert.Contains(t, respBody, errMsg)
 			}
+			assert.Empty(t, svcmock.emails)
+			assert.Empty(t, svcmock.tweets)
+			assert.Empty(t, svcmock.slacks)
 		}
 
 		resetServiceMock(svcmock)
 	}
-
-	// - post some form data to the create job page
-	// - assert the right sql insert query is called
-	// - assert email sent
-	// - assert slack and twitter posts
 }
 
 func TestViewJob(t *testing.T) {
