@@ -23,7 +23,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-// Things to test:
+// TODO: Things to test:
 // - job deleted after 30 days?
 
 func TestIndex(t *testing.T) {
