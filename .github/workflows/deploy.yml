@@ -1,4 +1,4 @@
-name: Fly Deploy
+name: Check and Deploy
 on:
   push:
     branches: [$default-branch]
@@ -11,6 +11,7 @@ jobs:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@v2
+      - uses: ./.github/actions/check
       - uses: superfly/flyctl-actions@1.1
         with:
           args: "deploy"

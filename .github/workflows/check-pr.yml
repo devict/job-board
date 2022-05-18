@@ -1,0 +1,10 @@
+name: Check PR
+on:
+  pull_request:
+    branches: [$default-branch]
+jobs:
+  test:
+    name: Build and Test
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/check
