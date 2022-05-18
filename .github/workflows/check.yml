@@ -1,0 +1,30 @@
+name: Check
+on:
+  pull_request:
+    branches: [$default-branch]
+  push:
+    branches: [$default-branch]
+jobs:
+  test:
+    name: Build and Test
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+      - run: go build -v ./...
+      - run: make test
+      # - if: success()
+      #   uses: slackapi/slack-github-action@v1.18.0
+      #   with:
+      #     payload: |
+      #       {
+      #         "text": "deployed <https://github.com/${{ github.repository }}/commit/${{ github.sha}}|${{ github.sha }}>"
+      #       }
+      # - if: failure()
+      #   uses: slackapi/slack-github-action@v1.18.0
+      #   with:
+      #     payload: |
+      #       {
+      #         "text": "deploy failed! <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|inspect the job>"
+      #       }
