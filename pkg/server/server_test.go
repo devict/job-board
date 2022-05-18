@@ -30,10 +30,10 @@ func TestIndex(t *testing.T) {
 	s, _, dbmock, _ := makeServer(t)
 	defer s.Close()
 
-	rows := sqlmock.NewRows(getDbFields(data.Job{})).
-		AddRow(mockJobRow(data.Job{Position: "Pos 1"})...).
-		AddRow(mockJobRow(data.Job{Position: "Pos 2"})...)
-	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(rows)
+	expectSelectJobsQuery(dbmock, []data.Job{
+		{Position: "Pos 1"},
+		{Position: "Pos 2"},
+	})
 
 	body, _ := sendRequest(t, s.URL, nil)
 
@@ -149,7 +149,7 @@ func TestCreateJob(t *testing.T) {
 				sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(newJob)...),
 			)
 
-			expectHomeQuery(dbmock, []data.Job{newJob})
+			expectSelectJobsQuery(dbmock, []data.Job{newJob})
 		}
 
 		reqBody := url.Values(tt.values).Encode()
@@ -215,9 +215,7 @@ func TestViewJob(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
-			sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(tt.job)...),
-		)
+		expectGetJobQuery(dbmock, tt.job)
 
 		respBody, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s", s.URL, tt.job.ID), nil)
 
@@ -242,9 +240,7 @@ func TestEditJobUnauthorized(t *testing.T) {
 
 	job := data.Job{ID: "1", PublishedAt: time.Now()}
 
-	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
-		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
-	)
+	expectGetJobQuery(dbmock, job)
 
 	_, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s/edit?token=incorrect", s.URL, job.ID), nil)
 	assert.Equal(t, 403, resp.StatusCode)
@@ -255,9 +251,7 @@ func TestUpdateJobUnauthorized(t *testing.T) {
 
 	job := data.Job{ID: "1", PublishedAt: time.Now()}
 
-	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
-		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
-	)
+	expectGetJobQuery(dbmock, job)
 
 	_, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s?token=incorrect", s.URL, job.ID), []byte("daaaata"))
 	assert.Equal(t, 403, resp.StatusCode)
@@ -277,12 +271,8 @@ func TestEditJobAuthorized(t *testing.T) {
 
 	// Query executes twice, once for the auth middleware, and
 	// a second time for the actual route
-	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
-		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
-	)
-	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(
-		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
-	)
+	expectGetJobQuery(dbmock, job)
+	expectGetJobQuery(dbmock, job)
 
 	signedEditRoute := server.SignedJobRoute(job, conf)
 	respBody, resp := sendRequest(t, signedEditRoute, nil)
@@ -295,10 +285,126 @@ func TestEditJobAuthorized(t *testing.T) {
 }
 
 func TestUpdateJobAuthorized(t *testing.T) {
-	// TODO
-	// - post data to update job route
-	// - assert sql update query
-	// - assert redirect to, wherever
+	s, svcmock, dbmock, conf := makeServer(t)
+	defer s.Close()
+
+	tests := []struct {
+		values            map[string][]string
+		expectSuccess     bool
+		expectErrMessages []string
+	}{
+		{
+			values: map[string][]string{
+				"position":     {"Pos"},
+				"organization": {"Org"},
+				"description":  {""},
+				"url":          {"https://devict.org"},
+			},
+			expectSuccess: true,
+		},
+		{
+			values: map[string][]string{
+				"position":     {"Pos"},
+				"organization": {"Org"},
+				"description":  {"Super rad place to work"},
+				"url":          {""},
+			},
+			expectSuccess: true,
+		},
+		{
+			values: map[string][]string{
+				"position":     {"Pos"},
+				"organization": {"Org"},
+				"description":  {""},
+				"url":          {""},
+			},
+			expectSuccess:     false,
+			expectErrMessages: []string{data.ErrNoUrlOrDescription},
+		},
+		{
+			values: map[string][]string{
+				"position":     {"Pos"},
+				"organization": {"Org"},
+				"description":  {""},
+				"url":          {"invalid"},
+			},
+			expectSuccess:     false,
+			expectErrMessages: []string{data.ErrInvalidUrl},
+		},
+	}
+
+	for _, tt := range tests {
+		job := data.Job{
+			ID:           "1",
+			Position:     "Original Position",
+			Organization: "Original Organization",
+			Url:          sql.NullString{Valid: false},
+			Description:  sql.NullString{String: "Original Description", Valid: true},
+			Email:        "secret@secret.com",
+			PublishedAt:  time.Now(),
+		}
+
+		// Expect requireAuth query
+		expectGetJobQuery(dbmock, job)
+
+		desc := tt.values["description"][0]
+		urlVal := tt.values["url"][0]
+		newParams := data.Job{
+			ID:           job.ID,
+			Position:     tt.values["position"][0],
+			Organization: tt.values["organization"][0],
+			Description:  sql.NullString{String: desc, Valid: desc != ""},
+			Url:          sql.NullString{String: urlVal, Valid: urlVal != ""},
+			PublishedAt:  job.PublishedAt,
+			Email:        job.Email,
+		}
+
+		if tt.expectSuccess {
+			expectGetJobQuery(dbmock, job)
+
+			dbmock.ExpectExec(`UPDATE jobs .+ WHERE id = .+`).WithArgs(
+				tt.values["position"][0],
+				tt.values["organization"][0],
+				sql.NullString{String: urlVal, Valid: urlVal != ""},
+				sql.NullString{String: desc, Valid: desc != ""},
+				job.ID,
+			).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			expectSelectJobsQuery(dbmock, []data.Job{newParams})
+		} else {
+			// On failure, expect twice again for the redirect to /edit
+			// which calls requireAuth, and then getJob for the view
+			expectGetJobQuery(dbmock, job)
+			expectGetJobQuery(dbmock, job)
+		}
+
+		reqBody := url.Values(tt.values).Encode()
+		route := fmt.Sprintf(
+			"%s/jobs/%s?token=%s",
+			s.URL,
+			job.ID,
+			server.SignatureForJob(job, conf.AppSecret),
+		)
+		respBody, resp := sendRequest(t, route, []byte(reqBody))
+
+		// Should follow the redirect and result in a 200 regardless of success/failure
+		assert.Equal(t, 200, resp.StatusCode)
+
+		// Should not resend any notifications on updates
+		assert.Empty(t, svcmock.emails)
+		assert.Empty(t, svcmock.tweets)
+		assert.Empty(t, svcmock.slacks)
+
+		if tt.expectSuccess {
+			assert.Contains(t, respBody, tt.values["position"][0])
+			assert.Contains(t, respBody, tt.values["organization"][0])
+		} else {
+			for _, errMsg := range tt.expectErrMessages {
+				assert.Contains(t, respBody, errMsg)
+			}
+		}
+	}
+
 }
 
 // Helpers ------------------------------
@@ -443,10 +549,17 @@ func mockJobRow(job data.Job) []driver.Value {
 	return vals
 }
 
-func expectHomeQuery(dbmock sqlmock.Sqlmock, jobs []data.Job) {
+func expectSelectJobsQuery(dbmock sqlmock.Sqlmock, jobs []data.Job) {
 	rows := sqlmock.NewRows(getDbFields(data.Job{}))
 	for _, job := range jobs {
 		rows.AddRow(mockJobRow(job)...)
 	}
 	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(rows)
+}
+
+// TODO: use this everywhere
+func expectGetJobQuery(dbmock sqlmock.Sqlmock, job data.Job) {
+	dbmock.ExpectQuery(`SELECT \* FROM jobs.+`).WillReturnRows(
+		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
+	)
 }

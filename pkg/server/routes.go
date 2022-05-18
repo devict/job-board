@@ -158,8 +158,9 @@ func (ctrl *Controller) UpdateJob(ctx *gin.Context) {
 			session.AddFlash(v, fmt.Sprintf("%s_err", k))
 		}
 
+		token := ctx.Query("token")
 		// TODO: somehow preserve previously provided values?
-		ctx.Redirect(302, "/jobs/"+id+"/edit")
+		ctx.Redirect(302, fmt.Sprintf("/jobs/%s/edit?token=%s", id, token))
 		return
 	}
 

@@ -107,7 +107,7 @@ func requireAuth(db *sqlx.DB, secret string) func(*gin.Context) {
 		}
 
 		token := ctx.Query("token")
-		expected := signatureForJob(job, secret)
+		expected := SignatureForJob(job, secret)
 
 		if token != expected {
 			ctx.AbortWithStatus(403)
