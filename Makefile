@@ -5,3 +5,7 @@ psql:
 .PHONY: seed-db
 seed-db:
 	docker compose exec app go run ./cmd/dbseeder/main.go
+
+.PHONY: test
+test:
+	go test ./...
