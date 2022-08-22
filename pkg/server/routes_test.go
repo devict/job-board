@@ -383,7 +383,7 @@ func TestUpdateJobAuthorized(t *testing.T) {
 			"%s/jobs/%s?token=%s",
 			s.URL,
 			job.ID,
-			server.SignatureForJob(job, conf.AppSecret),
+			job.AuthSignature(conf.AppSecret),
 		)
 		respBody, resp := sendRequest(t, route, []byte(reqBody))
 

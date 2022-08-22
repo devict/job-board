@@ -67,7 +67,7 @@ func NewServer(c *ServerConfig) (http.Server, error) {
 	router.GET("/jobs/:id", ctrl.ViewJob)
 
 	authorized := router.Group("/")
-	authorized.Use(requireAuth(sqlxDb, c.Config.AppSecret))
+	authorized.Use(requireTokenAuth(sqlxDb, c.Config.AppSecret, getJobAuthSignature))
 	{
 		authorized.GET("/jobs/:id/edit", ctrl.EditJob)
 		authorized.POST("/jobs/:id", ctrl.UpdateJob)
@@ -96,19 +96,30 @@ func renderer(templatePath string) multitemplate.Renderer {
 	return r
 }
 
-func requireAuth(db *sqlx.DB, secret string) func(*gin.Context) {
+func getJobAuthSignature(ctx *gin.Context, db *sqlx.DB, secret string) (string, error) {
+	jobID := ctx.Param("id")
+	job, err := data.GetJob(jobID, db)
+	if err != nil {
+		log.Println(fmt.Errorf("getJobAuthSignature failed to getJob: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return "", err
+	}
+
+	return job.AuthSignature(secret), nil
+}
+
+func requireTokenAuth(db *sqlx.DB, secret string, routeAuthCallback func(*gin.Context, *sqlx.DB, string) (string, error)) func(*gin.Context) {
 	return func(ctx *gin.Context) {
-		jobID := ctx.Param("id")
-		job, err := data.GetJob(jobID, db)
+		expected, err := routeAuthCallback(ctx, db, secret)
 		if err != nil {
-			log.Println(fmt.Errorf("requireAuth failed to getJob: %w", err))
+			log.Println(fmt.Errorf("requireAuth failed to get expected value: %w", err))
 			ctx.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 
 		token := ctx.Query("token")
-		expected := SignatureForJob(job, secret)
 
+		// This is the same if it is a job or a user
 		if token != expected {
 			ctx.AbortWithStatus(403)
 			return
