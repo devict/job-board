@@ -257,6 +257,17 @@ func TestUpdateJobUnauthorized(t *testing.T) {
 	assert.Equal(t, 403, resp.StatusCode)
 }
 
+func TestUpdateJobDoesNotExist(t *testing.T) {
+	s, _, dbmock, _ := makeServer(t)
+
+	job := data.Job{ID: "1", PublishedAt: time.Now()}
+
+	expectGetJobQuery(dbmock, job)
+
+	_, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s?token=incorrect", s.URL, "32"), []byte("daaaata"))
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
 func TestEditJobAuthorized(t *testing.T) {
 	_, _, dbmock, conf := makeServer(t)
 
@@ -383,7 +394,7 @@ func TestUpdateJobAuthorized(t *testing.T) {
 			"%s/jobs/%s?token=%s",
 			s.URL,
 			job.ID,
-			server.SignatureForJob(job, conf.AppSecret),
+			job.AuthSignature(conf.AppSecret),
 		)
 		respBody, resp := sendRequest(t, route, []byte(reqBody))
 
