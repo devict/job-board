@@ -15,4 +15,4 @@ jobs:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       uses: abinoda/slack-action@v1.0.7
       with:
-        args: '{\"channel\":\"C02TAGHRE\",\"text\":\"Hello world\"}'
+        args: '{\"channel\":\"C02TAGHRE\",\"text\":\"There is a new push or pull request in the Job Board\"}'
