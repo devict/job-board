@@ -8,11 +8,26 @@ a go rewrite of the original [devICT job board](https://github.com/devict/jobs.d
 - that's mainly it!
 - for a nicer local dev experience, having go and some go IDE integration set up is likely worthwhile
 
+## setup for development
+
+- Copy `.env.example` to `.env` and make any desired changes
+- (If on Windows) Make sure your local repository path (for example `C:\Users\username\repos\job-board`) is available for Docker Filesharing by going to `Docker Dashboard > Settings > Resources > File Sharing`
+
 ## running locally
 
-```shell
-$ docker compose up
-```
+1. Run docker
+
+    On Linux
+    ```shell
+    $ docker compose up
+    ```
+
+    On Windows:
+    ```shell
+    $ docker-compose up
+    ```
+1. Open `localhost:8080` in the browser
+
 
 ## accessing the database
 

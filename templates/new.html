@@ -38,7 +38,7 @@
           <span class="form-error">{{ . }}</span>
         {{ end }}
       {{ end }}
-      <span class="form-description">Please provide a description below if no URL is available.</span>
+      <span class="form-description">Please provide a description and contact information below if no URL is available.</span>
       <textarea name="description" rows="4" class="form-textarea mb-3"></textarea>
     </label>
     <label class="block">
@@ -49,6 +49,7 @@
           <span class="form-error">{{ . }}</span>
         {{ end }}
       {{ end }}
+      <span class="form-description">This email is kept private to allow you to edit the post and is not displayed publicly.</span>
       <input type="email" name="email" class="form-input" value="" required>
     </label>
     <button class="btn btn-primary mt-6">Publish</button>
