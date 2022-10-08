@@ -265,7 +265,7 @@ func TestUpdateJobDoesNotExist(t *testing.T) {
 	expectGetJobQuery(dbmock, job)
 
 	_, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s?token=incorrect", s.URL, "32"), []byte("daaaata"))
-	assert.Equal(t, 500, resp.StatusCode)
+	assert.Equal(t, 404, resp.StatusCode)
 }
 
 func TestEditJobAuthorized(t *testing.T) {

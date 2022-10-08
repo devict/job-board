@@ -18,6 +18,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const JobRoute = "job"
+
 type ServerConfig struct {
 	Config         *config.Config
 	DB             *sql.DB
@@ -67,7 +69,7 @@ func NewServer(c *ServerConfig) (http.Server, error) {
 	router.GET("/jobs/:id", ctrl.ViewJob)
 
 	authorized := router.Group("/")
-	authorized.Use(requireTokenAuth(sqlxDb, c.Config.AppSecret, "job"))
+	authorized.Use(requireTokenAuth(sqlxDb, c.Config.AppSecret, JobRoute))
 	{
 		authorized.GET("/jobs/:id/edit", ctrl.EditJob)
 		authorized.POST("/jobs/:id", ctrl.UpdateJob)
@@ -98,23 +100,28 @@ func renderer(templatePath string) multitemplate.Renderer {
 
 func requireTokenAuth(db *sqlx.DB, secret, authType string) func(*gin.Context) {
 	return func(ctx *gin.Context) {
-    var expected string
+		var expected string
 
-    switch authType {
-    case "job":
-      jobID := ctx.Param("id")
-      job, err := data.GetJob(jobID, db)
-      if err != nil || job.ID != jobID {
-        log.Println(fmt.Errorf("requireTokenAuth failed to getJob: %w", err))
-        ctx.AbortWithStatus(http.StatusInternalServerError)
-        return
-      }
-      expected = job.AuthSignature(secret)
-    default:
-      log.Println("requireTokenAuth failed, unexpected authType:", authType)
-      ctx.AbortWithStatus(http.StatusInternalServerError)
-      return
-    }
+		switch authType {
+		case JobRoute:
+			jobID := ctx.Param("id")
+			job, err := data.GetJob(jobID, db)
+			if err != nil {
+				log.Println(fmt.Errorf("requiretokenauth failed to getjob: %w", err))
+				ctx.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+			if job.ID != jobID {
+				log.Println(fmt.Errorf("requiretokenauth failed to find job with getjob: %w", err))
+				ctx.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+			expected = job.AuthSignature(secret)
+		default:
+			log.Println("requireTokenAuth failed, unexpected authType:", authType)
+			ctx.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
 
 		token := ctx.Query("token")
 
