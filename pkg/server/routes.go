@@ -36,6 +36,10 @@ func (ctrl *Controller) Index(ctx *gin.Context) {
 	}))
 }
 
+func (ctrl *Controller) About(ctx *gin.Context) {
+	ctx.HTML(200, "about", gin.H{})
+}
+
 func (ctrl *Controller) NewJob(ctx *gin.Context) {
 	session := sessions.Default(ctx)
 

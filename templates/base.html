@@ -28,7 +28,10 @@
         </a>
       </div>
     </header>
-    <main class="px-4 py-16 flex-1">
+    <div class="text-center w-full pt-4 font-bold text-sm">
+      <p><a href="/about">Questions?</a></p>
+    </div>
+    <main class="px-4 py-4 flex-1">
       <div class="max-w-lg mx-auto">
         {{ range .flashes }}
           <p>{{ . }}</p>
@@ -38,12 +41,10 @@
     </main>
     <footer class="footer-image text-center font-semibold">
       <p class="block text-center text-orange-500 mb-1">Made by
-      <a href="https://devict.org">
-        <img src="/assets/svg/devict-logo.svg" alt="devICT" class="h-5 inline-block mx-auto">
-      </a>
+        <a href="https://devict.org"><img src="/assets/svg/devict-logo.svg" alt="devICT" class="h-5 inline-block mx-auto"></a>
       <p>
       <p class="text-orange-500">
-      <a href="https://github.com/devict/job-board" class="underline hover:no-underline focus:no-underline">Contribute on GitHub</a>
+        <a href="https://github.com/devict/job-board" class="underline hover:no-underline focus:no-underline">Contribute on GitHub</a>
       </p>
     </footer>
   </body>

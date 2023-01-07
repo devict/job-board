@@ -62,6 +62,7 @@ func NewServer(c *ServerConfig) (http.Server, error) {
 		TwitterService: c.TwitterService,
 	}
 	router.GET("/", ctrl.Index)
+	router.GET("/about", ctrl.About)
 	router.GET("/new", ctrl.NewJob)
 	router.POST("/jobs", ctrl.CreateJob)
 	router.GET("/jobs/:id", ctrl.ViewJob)
@@ -89,6 +90,7 @@ func renderer(templatePath string) multitemplate.Renderer {
 
 	r := multitemplate.NewRenderer()
 	r.AddFromFilesFuncs("index", funcMap, basePath, path.Join(templatePath, "index.html"))
+	r.AddFromFilesFuncs("about", funcMap, basePath, path.Join(templatePath, "about.html"))
 	r.AddFromFilesFuncs("new", funcMap, basePath, path.Join(templatePath, "new.html"))
 	r.AddFromFilesFuncs("edit", funcMap, basePath, path.Join(templatePath, "edit.html"))
 	r.AddFromFilesFuncs("view", funcMap, basePath, path.Join(templatePath, "view.html"))
