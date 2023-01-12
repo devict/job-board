@@ -1,0 +1,40 @@
+{{ define "content" }}
+  <h2 class="m-0 font-bold text-lg">{{ .role.Name }}{{ if .role.Phone.Valid }} ({{ .role.Phone.String }}){{ end }}</h2>
+  <div class="mb-6">{{ .role.Role }}</div>
+  {{ if .role.CompLow.Valid }}
+  <div class="mb-6">Seeking Compensation From: {{ .role.CompLow.String }}</div>
+  {{ end }}
+  {{ if .role.CompHigh.Valid }}
+  <div class="mb-6">Seeking Compensation Up To: {{ .role.CompHigh.String }}</div>
+  {{ end }}
+  <hr>
+  <div class="mb-6">{{ .resume }}</div>
+  <div class="mb-6">
+    <a href="mailto:{{ .role.Email }}" target="_blank" class="btn btn-primary">
+      Email
+    </a>
+    {{ if .role.Linkedin.Valid }}
+    <a href="{{ .role.Linkedin.String }}" target="_blank" class="btn btn-primary">
+      LinkedIn
+    </a>
+    {{ end }}
+    {{ if .role.Website.Valid }}
+    <a href="{{ .role.Website.String }}" target="_blank" class="btn btn-primary">
+      Website
+    </a>
+    {{ end }}
+    {{ if .role.Github.Valid }}
+    <a href="{{ .role.Github.String }}" target="_blank" class="btn btn-primary">
+      GitHub
+    </a>
+    {{ end }}
+  </div>
+  <a
+      href="/roles/{{ .role.ID }}"
+      class="relative z-10 text-gray-500 hover:underline focus:underline"
+      >
+      <time datetime="{{ .role.PublishedAt | formatAsRfc3339String }}" class="text-sm">
+        Posted {{ .role.PublishedAt | formatAsDate }}
+      </time>
+  </a>
+{{ end }}

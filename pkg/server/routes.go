@@ -30,8 +30,16 @@ func (ctrl *Controller) Index(ctx *gin.Context) {
 		return
 	}
 
+	roles, err := data.GetAllRoles(ctrl.DB)
+	if err != nil {
+		log.Println(fmt.Errorf("Index failed to getAllRoles: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
 	ctx.HTML(200, "index", addFlash(ctx, gin.H{
 		"jobs":   jobs,
+		"roles":  roles,
 		"noJobs": len(jobs) == 0,
 	}))
 }
@@ -123,7 +131,7 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 	}
 
 	if ctrl.SlackService != nil {
-		if err = ctrl.SlackService.PostToSlack(job); err != nil {
+		if err = ctrl.SlackService.PostJobToSlack(job); err != nil {
 			log.Println(fmt.Errorf("failed to postToSlack: %w", err))
 			// continuing...
 		}
@@ -203,6 +211,164 @@ func (ctrl *Controller) ViewJob(ctx *gin.Context) {
 	}
 
 	ctx.HTML(200, "view", gin.H{"job": job, "description": template.HTML(description)})
+}
+
+func (ctrl *Controller) NewRole(ctx *gin.Context) {
+	session := sessions.Default(ctx)
+
+	fields := []string{"name", "email", "phone", "role", "resume", "linkedin", "website", "github", "complow", "comphigh"}
+
+	tVars := gin.H{}
+	for _, k := range fields {
+		f := fmt.Sprintf("%s_err", k)
+		tVars[f] = session.Flashes(f)
+	}
+
+	ctx.HTML(200, "newrole", addFlash(ctx, tVars))
+}
+
+func (ctrl *Controller) CreateRole(ctx *gin.Context) {
+	var newRoleInput data.NewRole
+	if err := ctx.Bind(&newRoleInput); err != nil {
+		log.Println(fmt.Errorf("failed to ctx.Bind: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	session := sessions.Default(ctx)
+	defer func() {
+		if err := session.Save(); err != nil {
+			log.Println(fmt.Errorf("CreateRole failed to session.Save: %w", err))
+		}
+	}()
+
+	if errs := newRoleInput.Validate(false); len(errs) != 0 {
+		for k, v := range errs {
+			session.AddFlash(v, fmt.Sprintf("%s_err", k))
+		}
+
+		ctx.Redirect(302, "/newrole")
+		return
+	}
+
+	role, err := newRoleInput.SaveToDB(ctrl.DB)
+	if err != nil {
+		log.Println(fmt.Errorf("failed to save role to db: %w", err))
+		session.AddFlash("Error creating role")
+		ctx.Redirect(302, "/newrole")
+		return
+	}
+
+	if ctrl.EmailService != nil {
+		// TODO: make this a nicer html template?
+		message := fmt.Sprintf(
+			"Your job search has begun!\n\n<a href=\"%s\">Use this link to edit the posting</a>",
+			SignedRoleRoute(role, ctrl.Config),
+		)
+		err = ctrl.EmailService.SendEmail(newRoleInput.Email, "Post Created!", message)
+		if err != nil {
+			log.Println(fmt.Errorf("failed to sendEmail: %w", err))
+			// continuing...
+		}
+	}
+
+	if ctrl.SlackService != nil {
+		if err = ctrl.SlackService.PostRoleToSlack(role); err != nil {
+			log.Println(fmt.Errorf("failed to postToSlack: %w", err))
+			// continuing...
+		}
+	}
+
+	session.AddFlash("Post created!")
+	ctx.Redirect(302, "/")
+}
+
+func (ctrl *Controller) ViewRole(ctx *gin.Context) {
+	id := ctx.Param("id")
+	role, err := data.GetRole(id, ctrl.DB)
+	if err != nil {
+		log.Println(fmt.Errorf("failed to getRole: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	resume, err := role.RenderResume()
+	if err != nil {
+		log.Println(fmt.Errorf("failed to render resume as markdown: %w", err))
+		resume = role.Resume
+		// continuing...
+	}
+
+	ctx.HTML(200, "viewrole", gin.H{"role": role, "resume": template.HTML(resume)})
+}
+
+func (ctrl *Controller) EditRole(ctx *gin.Context) {
+	session := sessions.Default(ctx)
+
+	id := ctx.Param("id")
+	role, err := data.GetRole(id, ctrl.DB)
+	if err != nil {
+		log.Println(fmt.Errorf("failed to getRole: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	token := ctx.Query("token")
+	tVars := gin.H{"role": role, "token": token}
+
+	fields := []string{"name", "email", "phone", "role", "resume", "linkedin", "website", "github", "complow", "comphigh"}
+	for _, k := range fields {
+		f := fmt.Sprintf("%s_err", k)
+		tVars[f] = session.Flashes(f)
+	}
+
+	ctx.HTML(200, "editrole", addFlash(ctx, tVars))
+}
+
+func (ctrl *Controller) UpdateRole(ctx *gin.Context) {
+	id := ctx.Param("id")
+
+	var newRoleInput data.NewRole
+	if err := ctx.Bind(&newRoleInput); err != nil {
+		log.Println(fmt.Errorf("failed to ctx.Bind: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	session := sessions.Default(ctx)
+	defer func() {
+		if err := session.Save(); err != nil {
+			log.Println(fmt.Errorf("failed to session.Save: %w", err))
+		}
+	}()
+
+	if errs := newRoleInput.Validate(true); len(errs) != 0 {
+		for k, v := range errs {
+			session.AddFlash(v, fmt.Sprintf("%s_err", k))
+		}
+
+		token := ctx.Query("token")
+		// TODO: somehow preserve previously provided values?
+		ctx.Redirect(302, fmt.Sprintf("/roles/%s/edit?token=%s", id, token))
+		return
+	}
+
+	role, err := data.GetRole(id, ctrl.DB)
+	if err != nil {
+		log.Println(fmt.Errorf("failed to getRole: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	role.Update(newRoleInput)
+	if _, err = role.Save(ctrl.DB); err != nil {
+		log.Println(fmt.Errorf("failed to role.save: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	session.AddFlash("Role updated!")
+	ctx.Redirect(302, "/")
 }
 
 func addFlash(ctx *gin.Context, base gin.H) gin.H {

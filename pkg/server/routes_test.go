@@ -35,10 +35,17 @@ func TestIndex(t *testing.T) {
 		{Position: "Pos 2"},
 	})
 
+	expectSelectRolesQuery(dbmock, []data.Role{
+		{Name: "Foo Bar"},
+		{Name: "Baz Qux"},
+	})
+
 	body, _ := sendRequest(t, s.URL, nil)
 
 	assert.Contains(t, string(body), "Pos 1")
 	assert.Contains(t, string(body), "Pos 2")
+	assert.Contains(t, string(body), "Foo Bar")
+	assert.Contains(t, string(body), "Baz Qux")
 
 	// TODO: What other assertions do we want to make about the home page?
 }
@@ -62,6 +69,48 @@ func TestNewJob(t *testing.T) {
 		{"description", false, true},
 		{"url", false, false},
 		{"email", true, false},
+	}
+
+	for _, tt := range tests {
+		reqStr := ""
+		if tt.required {
+			reqStr = "required.*"
+		}
+
+		base := "input"
+		if tt.textArea {
+			base = "textarea"
+		}
+
+		r := fmt.Sprintf(`<%s.+name="%s".*%s>`, base, tt.field, reqStr)
+		assert.Regexp(t, regexp.MustCompile(r), body)
+	}
+}
+
+func TestNewRole(t *testing.T) {
+	s, _, _, _ := makeServer(t)
+	defer s.Close()
+
+	body, resp := sendRequest(t, fmt.Sprintf("%s/newrole", s.URL), nil)
+
+	assert.Equal(t, 200, resp.StatusCode)
+
+	// - assert that all the right fields are present
+	tests := []struct {
+		field    string
+		required bool
+		textArea bool
+	}{
+		{"name", true, false},
+		{"email", true, false},
+		{"phone", false, false},
+		{"role", true, false},
+		{"resume", true, true},
+		{"linkedin", false, false},
+		{"website", false, false},
+		{"github", false, false},
+		{"complow", false, false},
+		{"comphigh", false, false},
 	}
 
 	for _, tt := range tests {
@@ -150,6 +199,7 @@ func TestCreateJob(t *testing.T) {
 			)
 
 			expectSelectJobsQuery(dbmock, []data.Job{newJob})
+			expectSelectRolesQuery(dbmock, []data.Role{})
 		}
 
 		reqBody := url.Values(tt.values).Encode()
@@ -164,21 +214,138 @@ func TestCreateJob(t *testing.T) {
 
 			assert.Equal(t, 1, len(svcmock.emails))
 			assert.Equal(t, 1, len(svcmock.tweets))
-			assert.Equal(t, 1, len(svcmock.slacks))
+			assert.Equal(t, 1, len(svcmock.jobSlacks))
+			assert.Equal(t, 0, len(svcmock.roleSlacks))
 
 			assert.Equal(t, "Job Created!", svcmock.emails[0].subject)
 			assert.Equal(t, tt.values["email"][0], svcmock.emails[0].recipient)
 			assert.Contains(t, svcmock.emails[0].body, server.SignedJobRoute(newJob, conf))
 
 			assert.Contains(t, svcmock.tweets, newJob)
-			assert.Contains(t, svcmock.slacks, newJob)
+			assert.Contains(t, svcmock.jobSlacks, newJob)
 		} else {
 			for _, errMsg := range tt.expectErrMessages {
 				assert.Contains(t, respBody, errMsg)
 			}
 			assert.Empty(t, svcmock.emails)
 			assert.Empty(t, svcmock.tweets)
-			assert.Empty(t, svcmock.slacks)
+			assert.Empty(t, svcmock.jobSlacks)
+			assert.Empty(t, svcmock.roleSlacks)
+		}
+
+		resetServiceMock(svcmock)
+	}
+}
+
+func TestCreateRole(t *testing.T) {
+	s, svcmock, dbmock, conf := makeServer(t)
+	defer s.Close()
+
+	tests := []struct {
+		values            map[string][]string
+		expectSuccess     bool
+		expectErrMessages []string
+	}{
+		{
+			values: map[string][]string{
+				"name":     {"Test McTestington"},
+				"email":    {"test@example.com"},
+				"phone":    {"316-555-1111"},
+				"role":     {"role 1"},
+				"resume":   {"neat"},
+				"linkedin": {"https://www.linkedin.com/example"},
+				"website":  {""},
+				"github":   {""},
+				"complow":  {""},
+				"comphigh": {""},
+			},
+			expectSuccess: true,
+		},
+		{
+			values: map[string][]string{
+				"name":     {"Test McTestington"},
+				"email":    {"test@example.com"},
+				"phone":    {""},
+				"role":     {"role 2"},
+				"resume":   {"wow"},
+				"linkedin": {""},
+				"website":  {""},
+				"github":   {""},
+				"complow":  {""},
+				"comphigh": {""},
+			},
+			expectSuccess: true,
+		},
+		{
+			values: map[string][]string{
+				"name":     {"Test McTestington"},
+				"email":    {"testexample.com"},
+				"phone":    {""},
+				"role":     {"role 1"},
+				"resume":   {"cool"},
+				"linkedin": {""},
+				"website":  {""},
+				"github":   {""},
+				"complow":  {""},
+				"comphigh": {""},
+			},
+			expectSuccess:     false,
+			expectErrMessages: []string{data.ErrInvalidEmail},
+		},
+	}
+
+	for _, tt := range tests {
+		newRole := data.Role{
+			ID:          "1",
+			Name:        tt.values["name"][0],
+			Email:       tt.values["email"][0],
+			Phone:       sql.NullString{String: tt.values["phone"][0], Valid: tt.values["phone"][0] != ""},
+			Role:        tt.values["role"][0],
+			Resume:      tt.values["resume"][0],
+			Linkedin:    sql.NullString{String: tt.values["linkedin"][0], Valid: tt.values["linkedin"][0] != ""},
+			Website:     sql.NullString{String: tt.values["website"][0], Valid: tt.values["website"][0] != ""},
+			Github:      sql.NullString{String: tt.values["github"][0], Valid: tt.values["github"][0] != ""},
+			CompLow:     sql.NullString{String: tt.values["complow"][0], Valid: tt.values["complow"][0] != ""},
+			CompHigh:    sql.NullString{String: tt.values["comphigh"][0], Valid: tt.values["comphigh"][0] != ""},
+			PublishedAt: time.Now(),
+		}
+
+		if tt.expectSuccess {
+			dbmock.ExpectQuery(`INSERT INTO roles`).WillReturnRows(
+				sqlmock.NewRows(getDbFields(data.Role{})).AddRow(mockRoleRow(newRole)...),
+			)
+
+			expectSelectJobsQuery(dbmock, []data.Job{})
+			expectSelectRolesQuery(dbmock, []data.Role{newRole})
+		}
+
+		reqBody := url.Values(tt.values).Encode()
+		respBody, resp := sendRequest(t, fmt.Sprintf("%s/roles", s.URL), []byte(reqBody))
+
+		// Should follow the redirect and result in a 200 regardless of success/failure
+		assert.Equal(t, 200, resp.StatusCode)
+
+		if tt.expectSuccess {
+			assert.Contains(t, respBody, tt.values["name"][0])
+			assert.Contains(t, respBody, tt.values["role"][0])
+
+			assert.Equal(t, 1, len(svcmock.emails))
+			assert.Equal(t, 0, len(svcmock.tweets))
+			assert.Equal(t, 0, len(svcmock.jobSlacks))
+			assert.Equal(t, 1, len(svcmock.roleSlacks))
+
+			assert.Equal(t, "Post Created!", svcmock.emails[0].subject)
+			assert.Equal(t, tt.values["email"][0], svcmock.emails[0].recipient)
+			assert.Contains(t, svcmock.emails[0].body, server.SignedRoleRoute(newRole, conf))
+			assert.Contains(t, svcmock.roleSlacks, newRole)
+		} else {
+			for _, errMsg := range tt.expectErrMessages {
+				assert.Contains(t, respBody, errMsg)
+			}
+			assert.Empty(t, svcmock.emails)
+			assert.Empty(t, svcmock.tweets)
+			assert.Empty(t, svcmock.jobSlacks)
+			assert.Empty(t, svcmock.roleSlacks)
 		}
 
 		resetServiceMock(svcmock)
@@ -235,6 +402,64 @@ func TestViewJob(t *testing.T) {
 	}
 }
 
+func TestViewRole(t *testing.T) {
+	s, _, dbmock, _ := makeServer(t)
+	defer s.Close()
+
+	tests := []struct {
+		role data.Role
+	}{
+		{
+			role: data.Role{
+				ID:       "1",
+				Name:     "Test Testly",
+				Email:    "test@example.com",
+				Phone:    sql.NullString{String: "316-555-1515", Valid: true},
+				Role:     "Super cool role",
+				Resume:   "# hey\n\nhire this guy",
+				Linkedin: sql.NullString{String: "https://www.linkedin.com/in/example", Valid: true},
+				Website:  sql.NullString{},
+				Github:   sql.NullString{},
+				CompLow:  sql.NullString{},
+				CompHigh: sql.NullString{},
+			},
+		},
+		{
+			role: data.Role{
+				ID:       "2",
+				Name:     "Not Test Testly",
+				Email:    "test2@example.com",
+				Phone:    sql.NullString{},
+				Role:     "Also cool role",
+				Resume:   "# too cool\n\nfor linkedin",
+				Linkedin: sql.NullString{},
+				Website:  sql.NullString{},
+				Github:   sql.NullString{},
+				CompLow:  sql.NullString{},
+				CompHigh: sql.NullString{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		expectGetRoleQuery(dbmock, tt.role)
+
+		respBody, resp := sendRequest(t, fmt.Sprintf("%s/roles/%s", s.URL, tt.role.ID), nil)
+
+		assert.Equal(t, 200, resp.StatusCode)
+		assert.Contains(t, respBody, tt.role.Name)
+		assert.Contains(t, respBody, tt.role.Role)
+
+		if tt.role.Phone.Valid {
+			assert.Contains(t, respBody, tt.role.Phone.String)
+		}
+
+		if tt.role.Linkedin.Valid {
+			assert.Contains(t, respBody, tt.role.Linkedin.String)
+		}
+	}
+}
+
 func TestEditJobUnauthorized(t *testing.T) {
 	s, _, dbmock, _ := makeServer(t)
 
@@ -243,6 +468,17 @@ func TestEditJobUnauthorized(t *testing.T) {
 	expectGetJobQuery(dbmock, job)
 
 	_, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s/edit?token=incorrect", s.URL, job.ID), nil)
+	assert.Equal(t, 403, resp.StatusCode)
+}
+
+func TestEditRoleUnauthorized(t *testing.T) {
+	s, _, dbmock, _ := makeServer(t)
+
+	role := data.Role{ID: "1", PublishedAt: time.Now()}
+
+	expectGetRoleQuery(dbmock, role)
+
+	_, resp := sendRequest(t, fmt.Sprintf("%s/roles/%s/edit?token=incorrect", s.URL, role.ID), nil)
 	assert.Equal(t, 403, resp.StatusCode)
 }
 
@@ -257,6 +493,17 @@ func TestUpdateJobUnauthorized(t *testing.T) {
 	assert.Equal(t, 403, resp.StatusCode)
 }
 
+func TestUpdateRoleUnauthorized(t *testing.T) {
+	s, _, dbmock, _ := makeServer(t)
+
+	role := data.Role{ID: "1", PublishedAt: time.Now()}
+
+	expectGetRoleQuery(dbmock, role)
+
+	_, resp := sendRequest(t, fmt.Sprintf("%s/roles/%s?token=incorrect", s.URL, role.ID), []byte("daaaata"))
+	assert.Equal(t, 403, resp.StatusCode)
+}
+
 func TestUpdateJobDoesNotExist(t *testing.T) {
 	s, _, dbmock, _ := makeServer(t)
 
@@ -265,6 +512,17 @@ func TestUpdateJobDoesNotExist(t *testing.T) {
 	expectGetJobQuery(dbmock, job)
 
 	_, resp := sendRequest(t, fmt.Sprintf("%s/jobs/%s?token=incorrect", s.URL, "32"), []byte("daaaata"))
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestUpdateRoleDoesNotExist(t *testing.T) {
+	s, _, dbmock, _ := makeServer(t)
+
+	role := data.Role{ID: "1", PublishedAt: time.Now()}
+
+	expectGetRoleQuery(dbmock, role)
+
+	_, resp := sendRequest(t, fmt.Sprintf("%s/roles/%s?token=incorrect", s.URL, "32"), []byte("daaaata"))
 	assert.Equal(t, 404, resp.StatusCode)
 }
 
@@ -293,6 +551,39 @@ func TestEditJobAuthorized(t *testing.T) {
 	assert.Regexp(t, fmt.Sprintf(`<input.+name="position".*value="%s".*>`, job.Position), respBody)
 	assert.Regexp(t, fmt.Sprintf(`<input.+name="organization".*value="%s".*>`, job.Organization), respBody)
 	assert.Regexp(t, fmt.Sprintf(`<textarea.+name="description".*>%s</textarea>`, job.Description.String), respBody)
+}
+
+func TestEditRoleAuthorized(t *testing.T) {
+	_, _, dbmock, conf := makeServer(t)
+
+	role := data.Role{
+		ID:          "1",
+		Name:        "Test",
+		Email:       "test@example.com",
+		Phone:       sql.NullString{String: "316-555-1515", Valid: true},
+		Role:        "any",
+		Resume:      "# hey \n\n yo",
+		Linkedin:    sql.NullString{},
+		Website:     sql.NullString{},
+		Github:      sql.NullString{},
+		CompLow:     sql.NullString{},
+		CompHigh:    sql.NullString{},
+		PublishedAt: time.Now(),
+	}
+
+	// Query executes twice, once for the auth middleware, and
+	// a second time for the actual route
+	expectGetRoleQuery(dbmock, role)
+	expectGetRoleQuery(dbmock, role)
+
+	signedEditRoute := server.SignedRoleRoute(role, conf)
+	respBody, resp := sendRequest(t, signedEditRoute, nil)
+
+	assert.Equal(t, 200, resp.StatusCode)
+
+	assert.Regexp(t, fmt.Sprintf(`<input.+name="name".*value="%s".*>`, role.Name), respBody)
+	assert.Regexp(t, fmt.Sprintf(`<input.+name="role".*value="%s".*>`, role.Role), respBody)
+	assert.Regexp(t, fmt.Sprintf(`<textarea.+name="resume".*>%s</textarea>`, role.Resume), respBody)
 }
 
 func TestUpdateJobAuthorized(t *testing.T) {
@@ -382,6 +673,7 @@ func TestUpdateJobAuthorized(t *testing.T) {
 			).WillReturnResult(sqlmock.NewResult(0, 1))
 
 			expectSelectJobsQuery(dbmock, []data.Job{newParams})
+			expectSelectRolesQuery(dbmock, []data.Role{})
 		} else {
 			// On failure, expect twice again for the redirect to /edit
 			// which calls requireAuth, and then getJob for the view
@@ -404,7 +696,8 @@ func TestUpdateJobAuthorized(t *testing.T) {
 		// Should not resend any notifications on updates
 		assert.Empty(t, svcmock.emails)
 		assert.Empty(t, svcmock.tweets)
-		assert.Empty(t, svcmock.slacks)
+		assert.Empty(t, svcmock.jobSlacks)
+		assert.Empty(t, svcmock.roleSlacks)
 
 		if tt.expectSuccess {
 			assert.Contains(t, respBody, tt.values["position"][0])
@@ -415,7 +708,151 @@ func TestUpdateJobAuthorized(t *testing.T) {
 			}
 		}
 	}
+}
 
+func TestUpdateRoleAuthorized(t *testing.T) {
+	s, svcmock, dbmock, conf := makeServer(t)
+	defer s.Close()
+
+	tests := []struct {
+		values            map[string][]string
+		expectSuccess     bool
+		expectErrMessages []string
+	}{
+		{
+			values: map[string][]string{
+				"name":     {"Test McTestington"},
+				"email":    {"test@example.com"},
+				"phone":    {"316-555-1111"},
+				"role":     {"role 1"},
+				"resume":   {"# Cool\n\nwow"},
+				"linkedin": {"https://www.linkedin.com/example"},
+				"website":  {""},
+				"github":   {""},
+				"complow":  {""},
+				"comphigh": {""},
+			},
+			expectSuccess: true,
+		},
+		{
+			values: map[string][]string{
+				"name":     {"Test McTestington"},
+				"email":    {"test@example.com"},
+				"phone":    {""},
+				"role":     {"role 2"},
+				"resume":   {"# Cool\n\nwow"},
+				"linkedin": {""},
+				"website":  {""},
+				"github":   {""},
+				"complow":  {""},
+				"comphigh": {""},
+			},
+			expectSuccess: true,
+		},
+		{
+			values: map[string][]string{
+				"name":     {"Test McTestington"},
+				"email":    {"test@example.com"},
+				"phone":    {""},
+				"role":     {""},
+				"resume":   {"# Cool\n\nwow"},
+				"linkedin": {""},
+				"website":  {""},
+				"github":   {""},
+				"complow":  {""},
+				"comphigh": {""},
+			},
+			expectSuccess:     false,
+			expectErrMessages: []string{data.ErrNoRole},
+		},
+	}
+
+	for _, tt := range tests {
+		role := data.Role{
+			ID:          "1",
+			Name:        "Original Name",
+			Email:       "test@example.com",
+			Phone:       sql.NullString{Valid: false},
+			Role:        "Original Role",
+			Resume:      "Original Resume",
+			Linkedin:    sql.NullString{Valid: false},
+			Website:     sql.NullString{Valid: false},
+			Github:      sql.NullString{Valid: false},
+			CompLow:     sql.NullString{Valid: false},
+			CompHigh:    sql.NullString{Valid: false},
+			PublishedAt: time.Now(),
+		}
+
+		// Expect requireAuth query
+		expectGetRoleQuery(dbmock, role)
+
+		newParams := data.Role{
+			ID:          role.ID,
+			Name:        tt.values["name"][0],
+			Email:       role.Email,
+			Phone:       sql.NullString{String: tt.values["phone"][0], Valid: tt.values["phone"][0] != ""},
+			Role:        tt.values["role"][0],
+			Resume:      tt.values["resume"][0],
+			Linkedin:    sql.NullString{String: tt.values["linkedin"][0], Valid: tt.values["linkedin"][0] != ""},
+			Website:     sql.NullString{String: tt.values["website"][0], Valid: tt.values["website"][0] != ""},
+			Github:      sql.NullString{String: tt.values["github"][0], Valid: tt.values["github"][0] != ""},
+			CompLow:     sql.NullString{String: tt.values["complow"][0], Valid: tt.values["complow"][0] != ""},
+			CompHigh:    sql.NullString{String: tt.values["comphigh"][0], Valid: tt.values["comphigh"][0] != ""},
+			PublishedAt: role.PublishedAt,
+		}
+
+		if tt.expectSuccess {
+			expectGetRoleQuery(dbmock, role)
+
+			dbmock.ExpectExec(`UPDATE roles .+ WHERE id = .+`).WithArgs(
+				tt.values["name"][0],
+				sql.NullString{String: tt.values["phone"][0], Valid: tt.values["phone"][0] != ""},
+				tt.values["role"][0],
+				tt.values["resume"][0],
+				sql.NullString{String: tt.values["linkedin"][0], Valid: tt.values["linkedin"][0] != ""},
+				sql.NullString{String: tt.values["website"][0], Valid: tt.values["website"][0] != ""},
+				sql.NullString{String: tt.values["github"][0], Valid: tt.values["github"][0] != ""},
+				sql.NullString{String: tt.values["complow"][0], Valid: tt.values["complow"][0] != ""},
+				sql.NullString{String: tt.values["comphigh"][0], Valid: tt.values["comphigh"][0] != ""},
+				role.ID,
+			).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			expectSelectJobsQuery(dbmock, []data.Job{})
+			expectSelectRolesQuery(dbmock, []data.Role{newParams})
+		} else {
+			// On failure, expect twice again for the redirect to /edit
+			// which calls requireAuth, and then getJob for the view
+			expectGetRoleQuery(dbmock, role)
+			expectGetRoleQuery(dbmock, role)
+		}
+
+		reqBody := url.Values(tt.values).Encode()
+		route := fmt.Sprintf(
+			"%s/roles/%s?token=%s",
+			s.URL,
+			role.ID,
+			role.AuthSignature(conf.AppSecret),
+		)
+		respBody, resp := sendRequest(t, route, []byte(reqBody))
+
+		// Should follow the redirect and result in a 200 regardless of success/failure
+		assert.Equal(t, 200, resp.StatusCode)
+
+		// Should not resend any notifications on updates
+		assert.Empty(t, svcmock.emails)
+		assert.Empty(t, svcmock.tweets)
+		assert.Empty(t, svcmock.jobSlacks)
+		assert.Empty(t, svcmock.roleSlacks)
+
+		if tt.expectSuccess {
+			assert.Contains(t, respBody, tt.values["name"][0])
+			assert.Contains(t, respBody, tt.values["role"][0])
+		} else {
+			for _, errMsg := range tt.expectErrMessages {
+				assert.Contains(t, respBody, errMsg)
+			}
+		}
+	}
 }
 
 // Helpers ------------------------------
@@ -425,9 +862,10 @@ type email struct {
 }
 
 type mockService struct {
-	emails []email
-	tweets []data.Job
-	slacks []data.Job
+	emails     []email
+	tweets     []data.Job
+	jobSlacks  []data.Job
+	roleSlacks []data.Role
 }
 
 func (svc *mockService) SendEmail(recipient, subject, body string) error {
@@ -440,8 +878,13 @@ func (svc *mockService) PostToTwitter(job data.Job) error {
 	return nil
 }
 
-func (svc *mockService) PostToSlack(job data.Job) error {
-	svc.slacks = append(svc.slacks, job)
+func (svc *mockService) PostJobToSlack(job data.Job) error {
+	svc.jobSlacks = append(svc.jobSlacks, job)
+	return nil
+}
+
+func (svc *mockService) PostRoleToSlack(role data.Role) error {
+	svc.roleSlacks = append(svc.roleSlacks, role)
 	return nil
 }
 
@@ -500,7 +943,8 @@ func sendRequest(t *testing.T, path string, postBody []byte) (string, *http.Resp
 func resetServiceMock(svc *mockService) {
 	svc.emails = []email{}
 	svc.tweets = []data.Job{}
-	svc.slacks = []data.Job{}
+	svc.jobSlacks = []data.Job{}
+	svc.roleSlacks = []data.Role{}
 }
 
 func getDbFields(thing interface{}) []string {
@@ -560,6 +1004,73 @@ func mockJobRow(job data.Job) []driver.Value {
 	return vals
 }
 
+func mockRoleRow(role data.Role) []driver.Value {
+	vals := []driver.Value{
+		"1",
+		"Test Testington",
+		"example@example.com",
+		sql.NullString{},
+		"All roles",
+		"wow cool",
+		sql.NullString{},
+		sql.NullString{},
+		sql.NullString{},
+		sql.NullString{},
+		sql.NullString{},
+		time.Now(),
+	}
+
+	if role.ID != "" {
+		vals[0] = role.ID
+	}
+
+	if role.Name != "" {
+		vals[1] = role.Name
+	}
+
+	if role.Email != "" {
+		vals[2] = role.Email
+	}
+
+	if role.Phone.Valid {
+		vals[3] = role.Phone
+	}
+
+	if role.Role != "" {
+		vals[4] = role.Role
+	}
+
+	if role.Resume != "" {
+		vals[5] = role.Resume
+	}
+
+	if role.Linkedin.Valid {
+		vals[6] = role.Linkedin
+	}
+
+	if role.Website.Valid {
+		vals[7] = role.Website
+	}
+
+	if role.Github.Valid {
+		vals[8] = role.Github
+	}
+
+	if role.CompLow.Valid {
+		vals[9] = role.CompLow
+	}
+
+	if role.CompHigh.Valid {
+		vals[10] = role.CompHigh
+	}
+
+	if !role.PublishedAt.IsZero() {
+		vals[11] = role.PublishedAt
+	}
+
+	return vals
+}
+
 func expectSelectJobsQuery(dbmock sqlmock.Sqlmock, jobs []data.Job) {
 	rows := sqlmock.NewRows(getDbFields(data.Job{}))
 	for _, job := range jobs {
@@ -568,9 +1079,23 @@ func expectSelectJobsQuery(dbmock sqlmock.Sqlmock, jobs []data.Job) {
 	dbmock.ExpectQuery(`SELECT \* FROM jobs`).WillReturnRows(rows)
 }
 
+func expectSelectRolesQuery(dbmock sqlmock.Sqlmock, roles []data.Role) {
+	rows := sqlmock.NewRows(getDbFields(data.Role{}))
+	for _, role := range roles {
+		rows.AddRow(mockRoleRow(role)...)
+	}
+	dbmock.ExpectQuery(`SELECT \* FROM roles`).WillReturnRows(rows)
+}
+
 // TODO: use this everywhere
 func expectGetJobQuery(dbmock sqlmock.Sqlmock, job data.Job) {
 	dbmock.ExpectQuery(`SELECT \* FROM jobs.+`).WillReturnRows(
 		sqlmock.NewRows(getDbFields(data.Job{})).AddRow(mockJobRow(job)...),
+	)
+}
+
+func expectGetRoleQuery(dbmock sqlmock.Sqlmock, role data.Role) {
+	dbmock.ExpectQuery(`SELECT \* FROM roles.+`).WillReturnRows(
+		sqlmock.NewRows(getDbFields(data.Role{})).AddRow(mockRoleRow(role)...),
 	)
 }
