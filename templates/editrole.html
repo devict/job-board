@@ -1,0 +1,88 @@
+{{ define "content" }}
+  <form method="post" action="/roles/{{ .role.ID }}?token={{ .token }}">
+    <!-- TODO: csrf -->
+    <label class="block">
+      <span class="form-label">Name</span>
+      <span class="align-top text-sm text-gray-500">*</span>
+      <!-- TODO: inline errors -->
+      {{ if .name_err }}
+        {{ range .name_err }}
+          <span class="form-error">{{ . }}</span>
+        {{ end }}
+      {{ end }}
+      <input name="name" class="form-input mb-3"  value="{{ .role.Name }}" required>
+    </label>
+    <label class="block">
+      <span class="form-label">Phone</span>
+      {{ if .phone_err }}
+        {{ range .phone_err }}
+          <span class="form-error">{{ . }}</span>
+        {{ end }}
+      {{ end }}
+      <input type="phone" name="phone" class="form-input mb-3" value="{{ .role.Phone.String }}">
+    </label>
+    <label class="block">
+      <span class="form-label">Desired Role</span>
+      <span class="align-top text-sm text-gray-500">*</span>
+      {{ if .role_err }}
+        {{ range .role_err }}
+          <span class="form-error">{{ . }}</span>
+        {{ end }}
+      {{ end }}
+      <input name="role" class="form-input mb-3" value="{{ .role.Role }}" required>
+    </label>
+    <label class="block">
+      <span class="form-label">Resume</span>
+      <span class="align-top text-sm text-gray-500">*</span>
+      {{ if .resume_err }}
+        {{ range .resume_err }}
+          <span class="form-error">{{ . }}</span>
+        {{ end }}
+      {{ end }}
+      <span class="form-description">Please provide a markdown version of your resume, or a URL to one.</span>
+      <textarea name="resume" rows="4" class="form-textarea mb-3">{{ .role.Resume }}</textarea>
+    </label>
+    <label class="block">
+      <span class="form-label">LinkedIn URL</span>
+      {{ if .linkedin_err }}
+        {{ range .linkedin_err }}
+          <span class="form-error">{{ . }}</span>
+        {{ end }}
+      {{ end }}
+      <input name="linkedin" class="form-input" value="{{ .role.Linkedin.String }}">
+    </label>
+    <label class="block">
+      <span class="form-label">Website</span>
+      {{ if .website_err }}
+        {{ range .website_err }}
+          <span class="form-error">{{ . }}</span>
+        {{ end }}
+      {{ end }}
+      <input name="website" class="form-input" value="{{ .role.Website.String }}">
+    </label>
+    <label class="block">
+      <span class="form-label">GitHub</span>
+      {{ if .github_err }}
+        {{ range .github_err }}
+          <span class="form-error">{{ . }}</span>
+        {{ end }}
+      {{ end }}
+      <input name="github" class="form-input" value="{{ .role.Github.String }}">
+    </label>
+    <label class="block">
+      <span class="form-label">Compensation Range</span>
+      {{ if .complow_err }}
+        {{ range .complow_err }}
+          <span class="form-error">{{ . }}</span>
+        {{ end }}
+      {{ end }}
+      {{ if .comphigh_err }}
+        {{ range .comphigh_err }}
+          <span class="form-error">{{ . }}</span>
+        {{ end }}
+      {{ end }}
+      <input name="complow" class="form-input" value="{{ .role.CompLow.String }}" placeholder="$xx,xxx"> to <input name="comphigh" class="form-input" value="{{ .role.CompHigh.String }}" placeholder="$xxx,xxx">
+    </label>
+    <button class="btn btn-primary mt-6">Update</button>
+  </form>
+{{ end }}

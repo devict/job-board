@@ -11,7 +11,8 @@ import (
 )
 
 type ISlackService interface {
-	PostToSlack(data.Job) error
+	PostJobToSlack(data.Job) error
+	PostRoleToSlack(data.Role) error
 }
 
 type SlackService struct {
@@ -22,7 +23,7 @@ type SlackMessage struct {
 	Text string `json:"text"`
 }
 
-func (svc *SlackService) PostToSlack(job data.Job) error {
+func (svc *SlackService) PostJobToSlack(job data.Job) error {
 	message := slackMessageFromJob(job, svc.Conf)
 	messageStr, err := json.Marshal(message)
 	if err != nil {
@@ -44,6 +45,32 @@ func slackMessageFromJob(job data.Job, c *config.Config) SlackMessage {
 		job.ID,
 		job.Position,
 		job.Organization,
+	)
+	return SlackMessage{Text: text}
+}
+
+func (svc *SlackService) PostRoleToSlack(role data.Role) error {
+	message := slackMessageFromRole(role, svc.Conf)
+	messageStr, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal slack message: %w", err)
+	}
+
+	_, err = http.Post(svc.Conf.SlackHook, "application/json", bytes.NewReader(messageStr))
+	if err != nil {
+		return fmt.Errorf("failed to post to slack: %w", err)
+	}
+
+	return nil
+}
+
+func slackMessageFromRole(role data.Role, c *config.Config) SlackMessage {
+	text := fmt.Sprintf(
+		"A new resume was posted!\n> *<%s/roles/%s|%s @ %s>*",
+		c.URL,
+		role.ID,
+		role.Name,
+		role.Role,
 	)
 	return SlackMessage{Text: text}
 }

@@ -20,6 +20,7 @@ import (
 )
 
 const JobRoute = "job"
+const RoleRoute = "role"
 
 type ServerConfig struct {
 	Config         *config.Config
@@ -69,12 +70,22 @@ func NewServer(c *ServerConfig) (http.Server, error) {
 	router.GET("/new", ctrl.NewJob)
 	router.POST("/jobs", ctrl.CreateJob)
 	router.GET("/jobs/:id", ctrl.ViewJob)
+	router.GET("/newrole", ctrl.NewRole)
+	router.POST("/roles", ctrl.CreateRole)
+	router.GET("/roles/:id", ctrl.ViewRole)
 
-	authorized := router.Group("/")
-	authorized.Use(requireTokenAuth(sqlxDb, c.Config.AppSecret, JobRoute))
+	authorizedJobs := router.Group("/jobs")
+	authorizedJobs.Use(requireTokenAuth(sqlxDb, c.Config.AppSecret, JobRoute))
 	{
-		authorized.GET("/jobs/:id/edit", ctrl.EditJob)
-		authorized.POST("/jobs/:id", ctrl.UpdateJob)
+		authorizedJobs.GET(":id/edit", ctrl.EditJob)
+		authorizedJobs.POST(":id", ctrl.UpdateJob)
+	}
+
+	authorizedRoles := router.Group("/roles")
+	authorizedRoles.Use(requireTokenAuth(sqlxDb, c.Config.AppSecret, RoleRoute))
+	{
+		authorizedRoles.GET(":id/edit", ctrl.EditRole)
+		authorizedRoles.POST(":id", ctrl.UpdateRole)
 	}
 
 	return http.Server{
@@ -97,6 +108,9 @@ func renderer(templatePath string) multitemplate.Renderer {
 	r.AddFromFilesFuncs("new", funcMap, basePath, path.Join(templatePath, "new.html"))
 	r.AddFromFilesFuncs("edit", funcMap, basePath, path.Join(templatePath, "edit.html"))
 	r.AddFromFilesFuncs("view", funcMap, basePath, path.Join(templatePath, "view.html"))
+	r.AddFromFilesFuncs("newrole", funcMap, basePath, path.Join(templatePath, "newrole.html"))
+	r.AddFromFilesFuncs("editrole", funcMap, basePath, path.Join(templatePath, "editrole.html"))
+	r.AddFromFilesFuncs("viewrole", funcMap, basePath, path.Join(templatePath, "viewrole.html"))
 
 	return r
 }
@@ -120,6 +134,20 @@ func requireTokenAuth(db *sqlx.DB, secret, authType string) func(*gin.Context) {
 				return
 			}
 			expected = []byte(job.AuthSignature(secret))
+		case RoleRoute:
+			roleID := ctx.Param("id")
+			role, err := data.GetRole(roleID, db)
+			if err != nil {
+				log.Println(fmt.Errorf("requiretokenauth failed to getRole: %w", err))
+				ctx.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+			if role.ID != roleID {
+				log.Println(fmt.Errorf("requiretokenauth failed to find role with getRole: %w", err))
+				ctx.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+			expected = []byte(role.AuthSignature(secret))
 		default:
 			log.Println("requireTokenAuth failed, unexpected authType:", authType)
 			ctx.AbortWithStatus(http.StatusInternalServerError)
