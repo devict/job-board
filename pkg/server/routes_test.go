@@ -510,7 +510,7 @@ func getDbFields(thing interface{}) []string {
 
 	for i := 0; i < t.NumField(); i++ {
 		dbTag := t.Field(i).Tag.Get("db")
-		if dbTag != "" {
+		if dbTag != "-" {
 			dbFields = append(dbFields, dbTag)
 		}
 	}

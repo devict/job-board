@@ -22,9 +22,9 @@ type Job struct {
 	Position        string         `db:"position" json:"position"`
 	Organization    string         `db:"organization" json:"organization"`
 	Url             sql.NullString `db:"url" json:"-"`
-	JSONUrl         *string        `json:"url"`
+	JSONUrl         *string        `db:"-" json:"url"`
 	Description     sql.NullString `db:"description" json:"-"`
-	DescriptionJSON *string        `json:"description"`
+	DescriptionJSON *string        `db:"-" json:"description"`
 	Email           string         `db:"email" json:"email"`
 	PublishedAt     time.Time      `db:"published_at" json:"published_at"`
 }
@@ -76,7 +76,7 @@ func (job *Job) RenderDescription() (string, error) {
 func (job *Job) Save(db *sqlx.DB) (sql.Result, error) {
 	return db.Exec(
 		"UPDATE jobs SET position = $1, organization = $2, url = $3, description = $4 WHERE id = $5",
-		job.Position, job.Organization, job.JSONUrl, job.DescriptionJSON, job.ID,
+		job.Position, job.Organization, job.Url, job.Description, job.ID,
 	)
 }
 
@@ -120,6 +120,13 @@ func GetJob(id string, db *sqlx.DB) (Job, error) {
 	err := db.Get(&job, "SELECT * FROM jobs WHERE id = $1", id)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return job, err
+	}
+
+	if !job.Url.Valid {
+		job.JSONUrl = &job.Url.String
+	}
+	if !job.Description.Valid {
+		job.DescriptionJSON = &job.Description.String
 	}
 
 	return job, nil

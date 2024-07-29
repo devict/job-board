@@ -44,6 +44,7 @@ func (ctrl *Controller) JobsJSON(ctx *gin.Context) {
 		return
 	}
 
+	ctx.Header("Content-Type", "application/json")
 	ctx.JSON(200, gin.H{"items": jobs})
 }
 
