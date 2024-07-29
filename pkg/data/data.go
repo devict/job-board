@@ -18,13 +18,15 @@ import (
 )
 
 type Job struct {
-	ID           string         `db:"id"`
-	Position     string         `db:"position"`
-	Organization string         `db:"organization"`
-	Url          sql.NullString `db:"url"`
-	Description  sql.NullString `db:"description"`
-	Email        string         `db:"email"`
-	PublishedAt  time.Time      `db:"published_at"`
+	ID              string         `db:"id" json:"id"`
+	Position        string         `db:"position" json:"position"`
+	Organization    string         `db:"organization" json:"organization"`
+	Url             sql.NullString `db:"url" json:"-"`
+	JSONUrl         *string        `json:"url"`
+	Description     sql.NullString `db:"description" json:"-"`
+	DescriptionJSON *string        `json:"description"`
+	Email           string         `db:"email" json:"email"`
+	PublishedAt     time.Time      `db:"published_at" json:"published_at"`
 }
 
 const (
@@ -74,7 +76,7 @@ func (job *Job) RenderDescription() (string, error) {
 func (job *Job) Save(db *sqlx.DB) (sql.Result, error) {
 	return db.Exec(
 		"UPDATE jobs SET position = $1, organization = $2, url = $3, description = $4 WHERE id = $5",
-		job.Position, job.Organization, job.Url, job.Description, job.ID,
+		job.Position, job.Organization, job.JSONUrl, job.DescriptionJSON, job.ID,
 	)
 }
 
@@ -98,6 +100,15 @@ func GetAllJobs(db *sqlx.DB) ([]Job, error) {
 	err := db.Select(&jobs, "SELECT * FROM jobs ORDER BY published_at DESC")
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return jobs, err
+	}
+
+	for i := range jobs {
+		if !jobs[i].Url.Valid {
+			jobs[i].JSONUrl = &jobs[i].Url.String
+		}
+		if !jobs[i].Description.Valid {
+			jobs[i].DescriptionJSON = &jobs[i].Description.String
+		}
 	}
 
 	return jobs, nil

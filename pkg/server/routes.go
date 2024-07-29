@@ -36,6 +36,17 @@ func (ctrl *Controller) Index(ctx *gin.Context) {
 	}))
 }
 
+func (ctrl *Controller) JobsJSON(ctx *gin.Context) {
+	jobs, err := data.GetAllJobs(ctrl.DB)
+	if err != nil {
+		log.Println(fmt.Errorf("JobsJSON failed to getAllJobs: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	ctx.JSON(200, gin.H{"items": jobs})
+}
+
 func (ctrl *Controller) About(ctx *gin.Context) {
 	ctx.HTML(200, "about", gin.H{})
 }

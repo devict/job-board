@@ -70,6 +70,8 @@ func NewServer(c *ServerConfig) (http.Server, error) {
 	router.POST("/jobs", ctrl.CreateJob)
 	router.GET("/jobs/:id", ctrl.ViewJob)
 
+	router.GET("/api/jobs", ctrl.JobsJSON)
+
 	authorized := router.Group("/")
 	authorized.Use(requireTokenAuth(sqlxDb, c.Config.AppSecret, JobRoute))
 	{
