@@ -123,11 +123,39 @@ func (ctrl *Controller) CreateJob(ctx *gin.Context) {
 
 	if ctrl.EmailService != nil {
 		// TODO: make this a nicer html template?
-		message := fmt.Sprintf(
-			"Your job has been created!\n\n<a href=\"%s\">Use this link to edit the job posting</a>",
-			SignedJobRoute(job, ctrl.Config),
-		)
-		err = ctrl.EmailService.SendEmail(newJobInput.Email, "Job Created!", message)
+		subject := fmt.Sprintf("Job %s Created!", newJobInput.Position)
+		message := fmt.Sprintf(`
+			<!doctype html>
+			<html>
+			<head>
+				<meta charset="UTF-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<title>Job Created</title>
+				<style>
+					body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
+					.container { max-width: 600px; margin: 0 auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+					h1 { color: #dc7900; }
+					p { font-size: 16px; line-height: 1.6; color: #555; }
+					a { color: #007BFF; text-decoration: none; }
+					a:hover { text-decoration: underline; }
+					.footer { margin-top: 20px; font-size: 12px; color: #999; text-align: center; }
+				</style>
+			</head>
+			<body>
+				<div class="container">
+					<h1>Job %s Created!</h1>
+					<p>Congratulations! Your job posting for the position <strong>%s</strong> has been successfully created.</p>
+					<p>You can edit or update your job posting by clicking the link below:</p>
+					<p><a href="%s">Edit Job Posting</a></p>
+					<div class="footer">
+						<p>&copy; <a href="https://jobs.devict.org/">Job Board</a></p>
+					</div>
+				</div>
+			</body>
+			</html>
+		`, newJobInput.Position, newJobInput.Position, SignedJobRoute(job, ctrl.Config))
+
+		err = ctrl.EmailService.SendEmail(newJobInput.Email, subject, message)
 		if err != nil {
 			log.Println(fmt.Errorf("failed to sendEmail: %w", err))
 			// continuing...
