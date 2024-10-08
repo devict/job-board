@@ -166,7 +166,8 @@ func TestCreateJob(t *testing.T) {
 			assert.Equal(t, 1, len(svcmock.tweets))
 			assert.Equal(t, 1, len(svcmock.slacks))
 
-			assert.Equal(t, "Job Created!", svcmock.emails[0].subject)
+			expectedSubject := fmt.Sprintf("Job %s Created!", tt.values["position"][0])
+			assert.Equal(t, expectedSubject, svcmock.emails[0].subject)
 			assert.Equal(t, tt.values["email"][0], svcmock.emails[0].recipient)
 			assert.Contains(t, svcmock.emails[0].body, server.SignedJobRoute(newJob, conf))
 
