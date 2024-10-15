@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,600,700&display=swap" rel="stylesheet">
     <link href="/assets/css/app.css" rel="stylesheet">
     <script src="https://cdn.usefathom.com/script.js" data-site="ICQJXHPJ" defer></script>
+    <script src="/assets/js/flash-messages.js" defer></script>
   </head>
   <body class="min-h-screen flex flex-col">
     <header class="header-image relative text-center">
@@ -34,7 +35,10 @@
     <main class="px-4 py-4 flex-1">
       <div class="max-w-lg mx-auto">
         {{ range .flashes }}
-          <p>{{ . }}</p>
+          <div class="flash-message">
+            {{ . }}
+            <button type="button" class="btn-close" aria-label="Close"></button>
+          </div>
         {{ end }}
         {{ template "content" . }}
       </div>
