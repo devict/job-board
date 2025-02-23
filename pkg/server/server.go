@@ -80,16 +80,18 @@ func NewServer(c *ServerConfig) (http.Server, error) {
 		authorized.POST("/jobs/:id/delete", ctrl.DeleteJob)
 	}
 
-	// Admin routes
-	admin := router.Group("/admin")
-	admin.Use(gin.BasicAuth(gin.Accounts{
-		c.Config.AdminUser: c.Config.AdminPassword,
-	}))
-	{
-		admin.GET("", ctrl.AdminIndex)
-		admin.GET("/jobs/:id/edit", ctrl.EditJob)
-		admin.POST("/jobs/:id", ctrl.UpdateJob)
-		admin.POST("/jobs/:id/delete", ctrl.DeleteJob)
+	if c.Config.AdminUser != "" {
+		// Admin routes
+		admin := router.Group("/admin")
+		admin.Use(gin.BasicAuth(gin.Accounts{
+			c.Config.AdminUser: c.Config.AdminPassword,
+		}))
+		{
+			admin.GET("", ctrl.AdminIndex)
+			admin.GET("/jobs/:id/edit", ctrl.EditJob)
+			admin.POST("/jobs/:id", ctrl.UpdateJob)
+			admin.POST("/jobs/:id/delete", ctrl.DeleteJob)
+		}
 	}
 
 	return http.Server{
