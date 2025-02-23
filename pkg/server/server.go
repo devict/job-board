@@ -80,6 +80,18 @@ func NewServer(c *ServerConfig) (http.Server, error) {
 		authorized.POST("/jobs/:id/delete", ctrl.DeleteJob)
 	}
 
+	// Admin routes
+	admin := router.Group("/admin")
+	admin.Use(gin.BasicAuth(gin.Accounts{
+		c.Config.AdminUser: c.Config.AdminPassword,
+	}))
+	{
+		admin.GET("", ctrl.AdminIndex)
+		admin.GET("/jobs/:id/edit", ctrl.EditJob)
+		admin.POST("/jobs/:id", ctrl.UpdateJob)
+		admin.POST("/jobs/:id/delete", ctrl.DeleteJob)
+	}
+
 	return http.Server{
 		Addr:    c.Config.Port,
 		Handler: router,
@@ -100,6 +112,7 @@ func renderer(templatePath string) multitemplate.Renderer {
 	r.AddFromFilesFuncs("new", funcMap, basePath, path.Join(templatePath, "new.html"))
 	r.AddFromFilesFuncs("edit", funcMap, basePath, path.Join(templatePath, "edit.html"))
 	r.AddFromFilesFuncs("view", funcMap, basePath, path.Join(templatePath, "view.html"))
+	r.AddFromFilesFuncs("admin", funcMap, basePath, path.Join(templatePath, "admin.html"))
 
 	return r
 }

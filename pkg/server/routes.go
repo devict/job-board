@@ -245,6 +245,19 @@ func (ctrl *Controller) ViewJob(ctx *gin.Context) {
 	ctx.HTML(200, "view", gin.H{"job": job, "description": template.HTML(description)})
 }
 
+func (ctrl *Controller) AdminIndex(ctx *gin.Context) {
+	jobs, err := data.GetAllJobs(ctrl.DB)
+	if err != nil {
+		log.Println(fmt.Errorf("failed to get jobs: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	ctx.HTML(http.StatusOK, "admin", gin.H{
+		"jobs": jobs,
+	})
+}
+
 func (ctrl *Controller) DeleteJob(ctx *gin.Context) {
 	id := ctx.Param("id")
 	err := data.DeleteJob(id, ctrl.DB)

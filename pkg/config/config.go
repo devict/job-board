@@ -8,14 +8,16 @@ import (
 )
 
 type Config struct {
-	URL         string `envconfig:"APP_URL" required:"true" default:"http://localhost:8080"`
-	Port        string `envconfig:"PORT" required:"true" default:":8080"`
-	Env         string `envconfig:"APP_ENV" required:"true" default:"debug"`
-	AppSecret   string `envconfig:"APP_SECRET" required:"true"`
-	DatabaseURL string `envconfig:"DATABASE_URL" required:"true"`
-	Email       *EmailConfig
-	Twitter     *TwitterConfig
-	SlackHook   string `envconfig:"SLACK_HOOK"`
+	URL           string `envconfig:"APP_URL" required:"true" default:"http://localhost:8080"`
+	Port          string `envconfig:"PORT" required:"true" default:":8080"`
+	Env           string `envconfig:"APP_ENV" required:"true" default:"debug"`
+	AppSecret     string `envconfig:"APP_SECRET" required:"true"`
+	DatabaseURL   string `envconfig:"DATABASE_URL" required:"true"`
+	Email         *EmailConfig
+	Twitter       *TwitterConfig
+	SlackHook     string `envconfig:"SLACK_HOOK"`
+	AdminUser     string `envconfig:"ADMIN_USER" required:"true"`
+	AdminPassword string `envconfig:"ADMIN_PASSWORD" require:"true"`
 }
 
 type EmailConfig struct {
