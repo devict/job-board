@@ -82,9 +82,13 @@ func NewServer(c *ServerConfig) (http.Server, error) {
 
 	// Admin routes
 	admin := router.Group("/admin")
-	admin.Use(gin.BasicAuth(gin.Accounts{
-		c.Config.AdminUser: c.Config.AdminPassword,
-	}))
+
+	accounts := gin.Accounts{}
+	if c.Config.AdminUser != "" {
+		accounts[c.Config.AdminUser] = c.Config.AdminPassword
+	}
+
+	admin.Use(gin.BasicAuth(accounts))
 	{
 		admin.GET("", ctrl.AdminIndex)
 		admin.GET("/jobs/:id/edit", ctrl.EditJob)

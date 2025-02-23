@@ -16,8 +16,8 @@ type Config struct {
 	Email         *EmailConfig
 	Twitter       *TwitterConfig
 	SlackHook     string `envconfig:"SLACK_HOOK"`
-	AdminUser     string `envconfig:"ADMIN_USER" required:"true"`
-	AdminPassword string `envconfig:"ADMIN_PASSWORD" require:"true"`
+	AdminUser     string `envconfig:"ADMIN_USER"`
+	AdminPassword string `envconfig:"ADMIN_PASSWORD"`
 }
 
 type EmailConfig struct {
