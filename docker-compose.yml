@@ -21,6 +21,8 @@ services:
       APP_SECRET: "itsasecret"
       APP_ENV: "debug"
       FROM_EMAIL: "test@localhost"
+      ADMIN_USER: "admin"
+      ADMIN_PASSWORD: "password"
     volumes:
       - .:/app
     ports:
