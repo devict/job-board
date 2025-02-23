@@ -245,6 +245,25 @@ func (ctrl *Controller) ViewJob(ctx *gin.Context) {
 	ctx.HTML(200, "view", gin.H{"job": job, "description": template.HTML(description)})
 }
 
+func (ctrl *Controller) DeleteJob(ctx *gin.Context) {
+	id := ctx.Param("id")
+	err := data.DeleteJob(id, ctrl.DB)
+	if err != nil {
+		log.Println(fmt.Errorf("failed to delete job: %w", err))
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	session := sessions.Default(ctx)
+	session.AddFlash("Job deleted!")
+	if err := session.Save(); err != nil {
+		log.Println(fmt.Errorf("DeleteJob failed to session.Save: %w", err))
+	}
+
+	ctx.Redirect(http.StatusFound, "/")
+}
+
+
 func addFlash(ctx *gin.Context, base gin.H) gin.H {
 	session := sessions.Default(ctx)
 	base["flashes"] = session.Flashes()

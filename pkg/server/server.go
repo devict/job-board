@@ -77,6 +77,7 @@ func NewServer(c *ServerConfig) (http.Server, error) {
 	{
 		authorized.GET("/jobs/:id/edit", ctrl.EditJob)
 		authorized.POST("/jobs/:id", ctrl.UpdateJob)
+		authorized.POST("/jobs/:id/delete", ctrl.DeleteJob)
 	}
 
 	return http.Server{

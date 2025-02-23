@@ -132,6 +132,21 @@ func GetJob(id string, db *sqlx.DB) (Job, error) {
 	return job, nil
 }
 
+func DeleteJob(id string, db *sqlx.DB) (error) {
+  result, err := db.Exec("DELETE FROM jobs WHERE id = $1", id)
+  if err != nil {
+    return err
+  }
+  rowsAffected, err := result.RowsAffected()
+  if err != nil {
+    return err
+  }
+  if rowsAffected != 1 {
+    return fmt.Errorf("failed to delete job: %w", err)
+  }
+  return nil
+}
+
 type NewJob struct {
 	Position     string `form:"position"`
 	Organization string `form:"organization"`
